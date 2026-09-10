@@ -13,7 +13,7 @@ and consistency matter more than cleverness. It grows one vertical-slice feature
 
 ```bash
 dotnet build                                  # analyzers run here; compiler warnings are errors
-dotnet test                                   # NUnit; 122 tests
+dotnet test                                   # NUnit; 149 tests (incl. NetArchTest arch rules)
 dotnet format --verify-no-changes             # style + whitespace gate (CI)
 dotnet format                                 # apply style fixes
 dotnet run --project src/AspNetDesignPatterns.Api   # needs src/.../.env (copy .env.example)
@@ -99,6 +99,10 @@ override block — a test name is a sentence, and test fixtures use invariant li
   it deterministic.
 - `tests/…/TestSupport/` holds shared doubles (`FakeHostEnvironment`, `ManageEnvironmentVariables`,
   `StubHttpMessageHandler`).
+- `tests/…/Architecture/` enforces the conventions in this file with NetArchTest (services
+  return `Result`, only clients throw, no cross-feature deps, role types named + sealed).
+  A failing arch test may mean the rule is too strict — fix whichever is at fault; if a rule
+  can't avoid false positives, delete it with a comment. See its README.
 
 ## When adding a feature
 

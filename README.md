@@ -51,7 +51,8 @@ dotnet test
 
 Unit tests cover the shared primitives and the `Weather` handler/service/validator in
 isolation. Integration tests (`tests/…/Integration`) boot the real app in memory with a
-fake `IWeatherClient` and assert status codes and `ProblemDetails` bodies.
+fake `IWeatherClient` and assert status codes and `ProblemDetails` bodies. Architecture
+tests (`tests/…/Architecture`) enforce the conventions themselves — see its README.
 
 ## Code quality
 
@@ -81,6 +82,7 @@ tests/AspNetDesignPatterns.Api.Tests/
   GlobalTestSetup.cs         [SetUpFixture] owning the one shared WebApplicationFactory
   TestSupport/               shared test doubles (FakeHostEnvironment, ManageEnvironmentVariables)
   DependencyInjection/ Shared/ Features/ Integration/   — mirrors the src layout
+  Architecture/              NetArchTest rules that enforce the conventions — see its README
 ```
 
 Every shared service has a focused unit-test file under `tests/…/` mirroring its folder, and
@@ -112,6 +114,7 @@ them.
 | **AuthN / AuthZ** | JWT bearer, named policies (`weather:read` scope), a Development-only dev-token endpoint. | [`Shared/Auth/`](src/AspNetDesignPatterns.Api/Shared/Auth) |
 | **Health checks** | `/health/live` (no checks) and `/health/ready` (checks tagged `ready`), split by intent, with a small custom JSON writer. Checks self-register from the owning slice. | [`Shared/HealthChecks/`](src/AspNetDesignPatterns.Api/Shared/HealthChecks), [`Features/Weather/WeatherProviderHealthCheck.cs`](src/AspNetDesignPatterns.Api/Features/Weather/WeatherProviderHealthCheck.cs) |
 | **DI graph validation** | `UseDefaultServiceProvider(ValidateOnBuild = true, ValidateScopes = true)` — startup fails on a mis-wired or captive dependency. | `Program.cs` |
+| **Architecture tests** | The conventions enforced as tests (NetArchTest): services return `Result`, only clients throw, no cross-feature dependencies, role types named + sealed. | [`tests/…/Architecture/`](tests/AspNetDesignPatterns.Api.Tests/Architecture) |
 
 For a narrated walk-through of how a single request touches all of the above, read
 **[`Features/Weather/README.md`](src/AspNetDesignPatterns.Api/Features/Weather/README.md)** —
