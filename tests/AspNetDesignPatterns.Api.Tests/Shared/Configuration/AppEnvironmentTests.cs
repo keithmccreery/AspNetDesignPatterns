@@ -9,8 +9,10 @@ public class AppEnvironmentTests
     [Test]
     public void Reflects_the_hosting_environment_name()
     {
-        var env = new AppEnvironment(new FakeHostEnvironment("Development"));
+        // Arrange & Act
+        AppEnvironment env = new(new FakeHostEnvironment("Development"));
 
+        // Assert
         using (new AssertionScope())
         {
             env.EnvironmentName.Should().Be("Development");
@@ -22,8 +24,10 @@ public class AppEnvironmentTests
     [Test]
     public void Recognises_production()
     {
-        var env = new AppEnvironment(new FakeHostEnvironment("Production"));
+        // Arrange & Act
+        AppEnvironment env = new(new FakeHostEnvironment("Production"));
 
+        // Assert
         using (new AssertionScope())
         {
             env.IsProduction.Should().BeTrue();
@@ -34,6 +38,7 @@ public class AppEnvironmentTests
     [Test]
     public void IsContainerized_reads_the_dotnet_runtime_flag()
     {
+        // Arrange & Act & Assert
         using (new ManageEnvironmentVariables(new Dictionary<string, string?> { ["DOTNET_RUNNING_IN_CONTAINER"] = "true" }))
         {
             new AppEnvironment(new FakeHostEnvironment("Production")).IsContainerized.Should().BeTrue();
@@ -48,8 +53,10 @@ public class AppEnvironmentTests
     [Test]
     public void Rejects_a_null_host_environment()
     {
-        var act = () => new AppEnvironment(null!);
+        // Arrange
+        Func<AppEnvironment> act = () => new AppEnvironment(null!);
 
+        // Act & Assert
         act.Should().Throw<ArgumentNullException>();
     }
 }

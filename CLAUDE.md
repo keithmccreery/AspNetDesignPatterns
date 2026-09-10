@@ -58,7 +58,10 @@ Running the app: copy `src/AspNetDesignPatterns.Api/.env.example` → `.env`, se
 
 ## Style (enforced by `.editorconfig` + `dotnet format`)
 
-- File-scoped namespaces, always braces, explicit types (not `var` — advisory, but match it).
+- File-scoped namespaces, always braces, explicit types everywhere — **never `var`** (the
+  analyzer rule is advisory, but the codebase has zero `var`; use target-typed `new()` when
+  the type is on the left). For a `throws`-assertion lambda use `Func<T>`, not `Action`, so
+  the constructed instance is still "used" (avoids CA1806).
 - **No primary constructors** — team preference; classic constructors with explicit fields.
 - Non-public `const` → `SCREAMING_CASE`; `public const` → PascalCase (BCL convention).
 - Trailing newline on every file.
@@ -72,11 +75,22 @@ IDisposableAnalyzers, VS Threading, ErrorProne.NET. Baseline is `suggestion`
 promoted to `warning`. Promote more as the codebase adopts them — don't silence to make a
 build pass without understanding the rule.
 
+Promoted to `warning` (see the `.editorconfig` block for the full list): the AsyncFixer /
+VSTHRD async-correctness set, `MA0040`/`MA0079` (flow the `CancellationToken`), `MA0002`
+(explicit `StringComparer`), `MA0076` (no implicit culture `ToString`), and `VSTHRD200`
+(`Async` suffix). `VSTHRD200`, `MA0002`, `MA0076` are turned back off in the test-project
+override block — a test name is a sentence, and test fixtures use invariant literals.
+`IDE0058` is off globally (fluent `.Should()` / DI chains, all noise). The build and
+`dotnet format analyzers --severity warn` are both expected to be clean.
+
 ## Tests
 
 - **NUnit** + AwesomeAssertions + NSubstitute. `AwesomeAssertions` is the free
   FluentAssertions fork; `NSubstitute` (not Moq).
 - Test tree mirrors `src/`. Every shared service has a focused unit-test file.
+- Every test body is sectioned with `// Arrange`, `// Act`, `// Assert` comments, in that
+  order. Fuse the labels when the steps fuse: `// Arrange & Act`, `// Act & Assert`, or
+  `// Arrange & Act & Assert` for a single fluent line.
 - Integration tests: one shared `WeatherApiFactory` owned by `GlobalTestSetup` (`[SetUpFixture]`)
   — Serilog's two-stage init freezes the static logger on host build, so a single host keeps
   it deterministic.

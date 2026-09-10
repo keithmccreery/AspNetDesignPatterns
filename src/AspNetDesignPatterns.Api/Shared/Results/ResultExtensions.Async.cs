@@ -36,7 +36,7 @@ public static partial class ResultExtensions
         Func<T, Task<TOut>> onSuccess,
         Func<Error, Task<TOut>> onFailure)
     {
-        var result = await resultTask;
+        Result<T> result = await resultTask;
         return await result.MatchAsync(onSuccess, onFailure);
     }
 
@@ -57,7 +57,7 @@ public static partial class ResultExtensions
         Func<Task<TOut>> onSuccess,
         Func<Error, Task<TOut>> onFailure)
     {
-        var result = await resultTask;
+        Result result = await resultTask;
         return await result.MatchAsync(onSuccess, onFailure);
     }
 
@@ -79,7 +79,7 @@ public static partial class ResultExtensions
         this Task<Result<TIn>> resultTask,
         Func<TIn, Task<TOut>> map)
     {
-        var result = await resultTask;
+        Result<TIn> result = await resultTask;
         return await result.MapAsync(map);
     }
 
@@ -101,7 +101,7 @@ public static partial class ResultExtensions
         this Task<Result<TIn>> resultTask,
         Func<TIn, Task<Result<TOut>>> next)
     {
-        var result = await resultTask;
+        Result<TIn> result = await resultTask;
         return await result.BindAsync(next);
     }
 
@@ -123,7 +123,7 @@ public static partial class ResultExtensions
         this Task<Result<TIn>> resultTask,
         Func<TIn, Task<Result>> next)
     {
-        var result = await resultTask;
+        Result<TIn> result = await resultTask;
         return await result.BindAsync(next);
     }
 
@@ -145,7 +145,7 @@ public static partial class ResultExtensions
         this Task<Result> resultTask,
         Func<Task<Result>> next)
     {
-        var result = await resultTask;
+        Result result = await resultTask;
         return result.IsSuccess ? await next() : result;
     }
 
@@ -163,7 +163,7 @@ public static partial class ResultExtensions
         this Task<Result> resultTask,
         Func<Task<Result<TOut>>> next)
     {
-        var result = await resultTask;
+        Result result = await resultTask;
         return result.IsSuccess ? await next() : Result.Failure<TOut>(result.Error);
     }
 
@@ -188,7 +188,7 @@ public static partial class ResultExtensions
         Func<T, Task<bool>> predicate,
         Error error)
     {
-        var result = await resultTask;
+        Result<T> result = await resultTask;
         return await result.EnsureAsync(predicate, error);
     }
 
@@ -211,7 +211,7 @@ public static partial class ResultExtensions
 
     public static async Task<Result<T>> TapAsync<T>(this Task<Result<T>> resultTask, Func<T, Task> action)
     {
-        var result = await resultTask;
+        Result<T> result = await resultTask;
         return await result.TapAsync(action);
     }
 
@@ -230,7 +230,7 @@ public static partial class ResultExtensions
 
     public static async Task<Result> TapAsync(this Task<Result> resultTask, Func<Task> action)
     {
-        var result = await resultTask;
+        Result result = await resultTask;
         return await result.TapAsync(action);
     }
 
@@ -249,7 +249,7 @@ public static partial class ResultExtensions
 
     public static async Task<Result<T>> TapErrorAsync<T>(this Task<Result<T>> resultTask, Func<Error, Task> action)
     {
-        var result = await resultTask;
+        Result<T> result = await resultTask;
         return await result.TapErrorAsync(action);
     }
 
@@ -268,7 +268,7 @@ public static partial class ResultExtensions
 
     public static async Task<Result> TapErrorAsync(this Task<Result> resultTask, Func<Error, Task> action)
     {
-        var result = await resultTask;
+        Result result = await resultTask;
         return await result.TapErrorAsync(action);
     }
 

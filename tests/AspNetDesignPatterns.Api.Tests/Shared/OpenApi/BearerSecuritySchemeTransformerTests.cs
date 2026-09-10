@@ -7,10 +7,10 @@ namespace AspNetDesignPatterns.Api.Tests.Shared.OpenApi;
 [TestFixture]
 public class BearerSecuritySchemeTransformerTests
 {
-    private static async Task<OpenApiDocument> Transform()
+    private static async Task<OpenApiDocument> TransformAsync()
     {
-        var document = new OpenApiDocument();
-        var transformer = new BearerSecuritySchemeTransformer();
+        OpenApiDocument document = new();
+        BearerSecuritySchemeTransformer transformer = new();
 
         await transformer.TransformAsync(document, context: null!, CancellationToken.None);
         return document;
@@ -19,9 +19,11 @@ public class BearerSecuritySchemeTransformerTests
     [Test]
     public async Task Adds_a_bearer_JWT_security_scheme_to_components()
     {
-        var document = await Transform();
+        // Arrange & Act
+        OpenApiDocument document = await TransformAsync();
 
-        var scheme = document.Components!.SecuritySchemes!["Bearer"];
+        // Assert
+        IOpenApiSecurityScheme scheme = document.Components!.SecuritySchemes!["Bearer"];
 
         using (new AssertionScope())
         {
@@ -34,8 +36,10 @@ public class BearerSecuritySchemeTransformerTests
     [Test]
     public async Task Adds_a_document_wide_security_requirement_referencing_the_scheme()
     {
-        var document = await Transform();
+        // Arrange & Act
+        OpenApiDocument document = await TransformAsync();
 
+        // Assert
         document.Security.Should().ContainSingle()
             .Which.Keys.Should().ContainSingle(k => k.Reference!.Id == "Bearer");
     }

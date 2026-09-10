@@ -21,9 +21,9 @@ public static class ValidationResultExtensions
             return Result.Success();
         }
 
-        var failures = validationResult.Errors
-            .GroupBy(e => e.PropertyName)
-            .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
+        Dictionary<string, string[]> failures = validationResult.Errors
+            .GroupBy(e => e.PropertyName, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray(), StringComparer.Ordinal);
 
         return new ValidationError(failures);
     }

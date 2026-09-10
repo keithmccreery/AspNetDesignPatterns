@@ -33,8 +33,8 @@ public sealed class ValidationFilter<TRequest>(IValidator<TRequest>? validator =
         }
 
         Dictionary<string, string[]> failures = validation.Errors
-            .GroupBy(e => e.PropertyName)
-            .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
+            .GroupBy(e => e.PropertyName, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray(), StringComparer.Ordinal);
 
         return new ValidationError(failures).ToProblem();
     }

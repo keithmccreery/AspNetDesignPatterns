@@ -22,12 +22,15 @@ public class GlobalExceptionHandlerTests
     [Test]
     public async Task Sets_a_500_status_and_writes_a_ProblemDetails()
     {
+        // Arrange
         _problemDetails.TryWriteAsync(Arg.Any<ProblemDetailsContext>()).Returns(true);
-        var httpContext = new DefaultHttpContext();
+        DefaultHttpContext httpContext = new();
 
-        var handled = await CreateHandler().TryHandleAsync(
+        // Act
+        bool handled = await CreateHandler().TryHandleAsync(
             httpContext, new InvalidOperationException("boom"), CancellationToken.None);
 
+        // Assert
         using (new AssertionScope())
         {
             handled.Should().BeTrue();
@@ -40,11 +43,14 @@ public class GlobalExceptionHandlerTests
     [Test]
     public async Task Reports_not_handled_when_the_ProblemDetails_service_declines()
     {
+        // Arrange
         _problemDetails.TryWriteAsync(Arg.Any<ProblemDetailsContext>()).Returns(false);
 
-        var handled = await CreateHandler().TryHandleAsync(
+        // Act
+        bool handled = await CreateHandler().TryHandleAsync(
             new DefaultHttpContext(), new InvalidOperationException("x"), CancellationToken.None);
 
+        // Assert
         handled.Should().BeFalse();
     }
 }

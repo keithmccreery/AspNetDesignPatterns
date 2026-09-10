@@ -25,7 +25,7 @@ internal sealed class OpenMeteoWeatherClient(
             $"/v1/forecast?latitude={latitude.ToString(CultureInfo.InvariantCulture)}" +
             $"&longitude={longitude.ToString(CultureInfo.InvariantCulture)}" +
             "&daily=temperature_2m_max,temperature_2m_min,precipitation_sum" +
-            $"&forecast_days={days}&timezone=UTC";
+            $"&forecast_days={days.ToString(CultureInfo.InvariantCulture)}&timezone=UTC";
 
         try
         {

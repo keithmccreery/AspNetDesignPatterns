@@ -9,7 +9,7 @@ public static class ResultUtilities
     /// <summary>Succeeds only if every input succeeded; otherwise returns the <b>first</b> failure.</summary>
     public static Result Combine(params IReadOnlyList<Result> results)
     {
-        foreach (var result in results)
+        foreach (Result result in results)
         {
             if (result.IsFailure)
             {
@@ -26,9 +26,9 @@ public static class ResultUtilities
     /// </summary>
     public static Result<IReadOnlyList<T>> Combine<T>(params IReadOnlyList<Result<T>> results)
     {
-        var values = new List<T>(results.Count);
+        List<T> values = new(results.Count);
 
-        foreach (var result in results)
+        foreach (Result<T> result in results)
         {
             if (result.IsFailure)
             {
@@ -48,10 +48,10 @@ public static class ResultUtilities
     /// </summary>
     public static Result CombineAll(params IReadOnlyList<Result> results)
     {
-        var failures = results
+        Dictionary<string, string[]> failures = results
             .Where(r => r.IsFailure)
-            .GroupBy(r => r.Error.Code)
-            .ToDictionary(g => g.Key, g => g.Select(r => r.Error.Message).ToArray());
+            .GroupBy(r => r.Error.Code, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.Select(r => r.Error.Message).ToArray(), StringComparer.Ordinal);
 
         return failures.Count == 0 ? Result.Success() : new ValidationError(failures);
     }
@@ -66,9 +66,9 @@ public static class ResultUtilities
     {
         Result<TOut>? lastFailure = null;
 
-        foreach (var item in items)
+        foreach (TIn item in items)
         {
-            var result = selector(item);
+            Result<TOut> result = selector(item);
             if (result.IsSuccess)
             {
                 return result;
@@ -88,7 +88,7 @@ public static class ResultUtilities
     /// <summary>Runs several guards over <paramref name="value"/>, returning the first that fails.</summary>
     public static Result<T> Ensure<T>(T value, params IReadOnlyList<(Func<T, bool> Predicate, Error Error)> guards)
     {
-        foreach (var (predicate, error) in guards)
+        foreach ((Func<T, bool> predicate, Error error) in guards)
         {
             if (!predicate(value))
             {

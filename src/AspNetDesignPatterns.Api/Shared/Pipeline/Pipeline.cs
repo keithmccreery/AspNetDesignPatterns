@@ -27,7 +27,7 @@ public sealed class Pipeline<TContext>(IServiceProvider serviceProvider)
     {
         int index = 0;
 
-        Task<Result> Next(CancellationToken token)
+        Task<Result> NextAsync(CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
 
@@ -38,9 +38,9 @@ public sealed class Pipeline<TContext>(IServiceProvider serviceProvider)
 
             Type stepType = _stepTypes[index++];
             IPipelineStep<TContext> step = (IPipelineStep<TContext>) _serviceProvider.GetRequiredService(stepType);
-            return step.ExecuteAsync(context, Next, token);
+            return step.ExecuteAsync(context, NextAsync, token);
         }
 
-        return Next(cancellationToken);
+        return NextAsync(cancellationToken);
     }
 }

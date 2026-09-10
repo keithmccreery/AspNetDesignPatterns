@@ -60,16 +60,20 @@ public class SettingsBaseTests
     [Test]
     public void FluentValidation_path_accepts_valid_settings()
     {
+        // Arrange & Act
         IOptions<FluentSettings> options = Resolve<FluentSettings>(new() { ["Fluent:Name"] = "ok" }, withValidator: true);
 
+        // Assert
         options.Value.Name.Should().Be("ok");
     }
 
     [Test]
     public void FluentValidation_path_rejects_invalid_settings_with_a_detailed_message()
     {
+        // Arrange & Act
         IOptions<FluentSettings> options = Resolve<FluentSettings>(new() { ["Fluent:Name"] = "" }, withValidator: true);
 
+        // Assert
         options.Invoking(o => o.Value).Should().Throw<OptionsValidationException>()
             .WithMessage("*FluentSettings.Name*");
     }
@@ -77,9 +81,11 @@ public class SettingsBaseTests
     [Test]
     public void DataAnnotations_path_is_used_when_no_validator_is_registered()
     {
+        // Arrange & Act
         IOptions<DataAnnotationsSettings> options = Resolve<DataAnnotationsSettings>(
             new() { ["DataAnnotations:Count"] = "99" }, withValidator: false);
 
+        // Assert
         options.Invoking(o => o.Value).Should().Throw<OptionsValidationException>()
             .WithMessage("*Count*");
     }
@@ -87,17 +93,21 @@ public class SettingsBaseTests
     [Test]
     public void DataAnnotations_path_accepts_valid_settings()
     {
+        // Arrange & Act
         IOptions<DataAnnotationsSettings> options = Resolve<DataAnnotationsSettings>(
             new() { ["DataAnnotations:Count"] = "5" }, withValidator: false);
 
+        // Assert
         options.Value.Count.Should().Be(5);
     }
 
     [Test]
     public void A_settings_class_without_a_Section_fails_fast_on_registration()
     {
-        var act = () => new NoSectionSettings().RegisterSettings(new ServiceCollection());
+        // Arrange
+        Action act = () => new NoSectionSettings().RegisterSettings(new ServiceCollection());
 
+        // Act & Assert
         act.Should().Throw<InvalidOperationException>().WithMessage("*Section*");
     }
 }

@@ -24,15 +24,18 @@ public class ValidationResultExtensionsTests
     [Test]
     public void A_valid_instance_becomes_a_success()
     {
+        // Arrange & Act & Assert
         _validator.ValidateAsResult(new Person("Ada", 30)).IsSuccess.Should().BeTrue();
     }
 
     [Test]
     public void An_invalid_instance_becomes_a_ValidationError_keeping_per_field_messages()
     {
+        // Arrange & Act
         Result result = _validator.ValidateAsResult(new Person("", -1));
 
-        var error = result.Error.Should().BeOfType<ValidationError>().Subject;
+        // Assert
+        ValidationError error = result.Error.Should().BeOfType<ValidationError>().Subject;
 
         using (new AssertionScope())
         {
@@ -45,6 +48,7 @@ public class ValidationResultExtensionsTests
     [Test]
     public async Task ValidateAsResultAsync_mirrors_the_sync_behaviour()
     {
+        // Arrange & Act & Assert
         (await _validator.ValidateAsResultAsync(new Person("Ada", 30))).IsSuccess.Should().BeTrue();
         (await _validator.ValidateAsResultAsync(new Person("", 0))).IsFailure.Should().BeTrue();
     }

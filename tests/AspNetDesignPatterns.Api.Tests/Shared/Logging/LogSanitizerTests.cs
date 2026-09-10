@@ -16,18 +16,21 @@ public class LogSanitizerTests
     [TestCase("", "")]
     public void Replaces_only_CR_and_LF(string input, string expected)
     {
+        // Act & Assert
         LogSanitizer.Sanitize(input).Should().Be(expected);
     }
 
     [Test]
     public void Leaves_other_control_characters_untouched()
     {
+        // Arrange & Act & Assert
         LogSanitizer.Sanitize("tab\tnull\0esc\x1b").Should().Be("tab\tnull\0esc\x1b");
     }
 
     [Test]
     public void Passes_null_through()
     {
+        // Arrange & Act & Assert
         LogSanitizer.Sanitize(null).Should().BeNull();
     }
 }
@@ -39,7 +42,7 @@ public class ControlCharacterSanitizingEnricherTests
 
     private static LogEvent EventWith(params (string Name, object? Value)[] properties)
     {
-        var props = properties.Select(p => new LogEventProperty(p.Name, new ScalarValue(p.Value)));
+        IEnumerable<LogEventProperty> props = properties.Select(p => new LogEventProperty(p.Name, new ScalarValue(p.Value)));
         return new LogEvent(DateTimeOffset.UtcNow, LogEventLevel.Information, exception: null, Template, props);
     }
 
@@ -49,10 +52,13 @@ public class ControlCharacterSanitizingEnricherTests
     [Test]
     public void Strips_CRLF_from_scalar_string_properties()
     {
-        var logEvent = EventWith(("User", "attacker\r\nFAKE ENTRY"), ("Path", "/safe"));
+        // Arrange
+        LogEvent logEvent = EventWith(("User", "attacker\r\nFAKE ENTRY"), ("Path", "/safe"));
 
+        // Act
         new ControlCharacterSanitizingEnricher().Enrich(logEvent, new NoopPropertyFactory());
 
+        // Assert
         using (new AssertionScope())
         {
             ScalarString(logEvent, "User").Should().Be("attacker__FAKE ENTRY");
@@ -63,10 +69,13 @@ public class ControlCharacterSanitizingEnricherTests
     [Test]
     public void Leaves_non_string_and_clean_properties_alone()
     {
-        var logEvent = EventWith(("Count", 42), ("Clean", "ok"));
+        // Arrange
+        LogEvent logEvent = EventWith(("Count", 42), ("Clean", "ok"));
 
+        // Act
         new ControlCharacterSanitizingEnricher().Enrich(logEvent, new NoopPropertyFactory());
 
+        // Assert
         using (new AssertionScope())
         {
             ((ScalarValue) logEvent.Properties["Count"]).Value.Should().Be(42);

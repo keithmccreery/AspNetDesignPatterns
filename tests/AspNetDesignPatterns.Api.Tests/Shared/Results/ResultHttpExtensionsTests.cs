@@ -19,15 +19,18 @@ public class ResultHttpExtensionsTests
     [TestCase(ErrorType.Failure, HttpStatusCode.InternalServerError)]
     public void Maps_each_error_type_to_its_status_code(ErrorType type, HttpStatusCode expected)
     {
+        // Act & Assert
         type.ToStatusCode().Should().Be((int) expected);
     }
 
     [Test]
     public void Failure_result_becomes_a_ProblemDetails_carrying_the_error_code()
     {
+        // Arrange & Act
         IResult httpResult = Result.Failure<int>(Error.NotFound("Widget.Missing", "gone")).ToHttpResult();
 
-        var problem = httpResult.Should().BeOfType<ProblemHttpResult>().Subject;
+        // Assert
+        ProblemHttpResult problem = httpResult.Should().BeOfType<ProblemHttpResult>().Subject;
 
         using (new AssertionScope())
         {
@@ -41,11 +44,14 @@ public class ResultHttpExtensionsTests
     [Test]
     public void ValidationError_becomes_a_400_validation_problem_with_the_fields()
     {
-        var failures = new Dictionary<string, string[]> { ["Age"] = ["must be positive"] };
+        // Arrange
+        Dictionary<string, string[]> failures = new() { ["Age"] = ["must be positive"] };
 
+        // Act
         IResult httpResult = Result.Failure<int>(new ValidationError(failures)).ToHttpResult();
 
-        var problem = httpResult.Should().BeOfType<ValidationProblem>().Subject;
+        // Assert
+        ValidationProblem problem = httpResult.Should().BeOfType<ValidationProblem>().Subject;
 
         using (new AssertionScope())
         {
@@ -57,18 +63,21 @@ public class ResultHttpExtensionsTests
     [Test]
     public void Success_result_becomes_200_with_the_value()
     {
+        // Arrange & Act & Assert
         Result.Success(7).ToHttpResult().Should().BeOfType<Ok<int>>().Which.Value.Should().Be(7);
     }
 
     [Test]
     public void Non_generic_success_becomes_204()
     {
+        // Arrange & Act & Assert
         Result.Success().ToHttpResult().Should().BeOfType<NoContent>();
     }
 
     [Test]
     public void A_custom_onSuccess_projection_is_used_when_supplied()
     {
+        // Arrange & Act & Assert
         Result.Success(5).ToHttpResult(v => TypedResults.Text($"value={v}"))
             .Should().BeOfType<Microsoft.AspNetCore.Http.HttpResults.ContentHttpResult>();
     }

@@ -25,14 +25,17 @@ public class WeatherEndpointTests
     [Test]
     public async Task Returns_401_without_a_token()
     {
+        // Arrange & Act
         HttpResponseMessage response = await Factory.CreateClient().GetAsync(VALID_ROUTE);
 
+        // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Test]
     public async Task Returns_the_mapped_forecast_with_a_valid_token()
     {
+        // Arrange
         Factory.WeatherClient.GetForecastAsync(default, default, default, default).ReturnsForAnyArgs(
             new OpenMeteoForecast(52.5, 13.4, "UTC", new OpenMeteoDaily(
                 [new DateOnly(2026, 9, 9), new DateOnly(2026, 9, 10)],
@@ -40,9 +43,11 @@ public class WeatherEndpointTests
                 [11.2, 10.8],
                 [0.0, 1.0])));
 
+        // Act
         HttpClient client = await Factory.CreateAuthenticatedClientAsync();
         ForecastResponse? forecast = await client.GetFromJsonAsync<ForecastResponse>(VALID_ROUTE);
 
+        // Assert
         forecast.Should().NotBeNull();
         forecast!.Days.Should().HaveCount(2);
         forecast.Days[0].TemperatureMaxC.Should().Be(20.4); // rounded by the pipeline
@@ -51,11 +56,14 @@ public class WeatherEndpointTests
     [Test]
     public async Task Returns_400_problem_details_for_an_out_of_range_parameter()
     {
+        // Arrange
         HttpClient client = await Factory.CreateAuthenticatedClientAsync();
 
+        // Act
         HttpResponseMessage response = await client.GetAsync("/api/v1/weather/forecast?latitude=999&longitude=13.4&days=2");
         HttpValidationProblemDetails? problem = await response.Content.ReadFromJsonAsync<HttpValidationProblemDetails>();
 
+        // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         problem!.Errors.Should().ContainKey("Latitude");
     }
@@ -63,14 +71,17 @@ public class WeatherEndpointTests
     [Test]
     public async Task Returns_502_problem_details_when_the_provider_throws()
     {
+        // Arrange
         Factory.WeatherClient.GetForecastAsync(default, default, default, default)
             .ThrowsAsyncForAnyArgs(new WeatherClientException("down", new HttpRequestException()));
 
+        // Act
         HttpClient client = await Factory.CreateAuthenticatedClientAsync();
 
         HttpResponseMessage response = await client.GetAsync(VALID_ROUTE);
         ProblemDetails? problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
 
+        // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadGateway);
         problem!.Extensions.Should().ContainKey("errorCode");
     }

@@ -28,7 +28,7 @@ public static class ResultLoggingExtensions
             return result;
         }
 
-        var error = result.Error;
+        Error error = result.Error;
 
         logger.LogError(
             error.Exception,
@@ -92,8 +92,8 @@ public static class ResultLoggingExtensions
             return result;
         }
 
-        var file = string.IsNullOrEmpty(filePath) ? "unknown" : Path.GetFileNameWithoutExtension(filePath);
-        var error = result.Error;
+        string file = string.IsNullOrEmpty(filePath) ? "unknown" : Path.GetFileNameWithoutExtension(filePath);
+        Error error = result.Error;
 
         logger.LogError(
             error.Exception,

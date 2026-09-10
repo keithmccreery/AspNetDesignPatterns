@@ -26,9 +26,10 @@ public class DevTokenIssuerTests
     [Test]
     public async Task Issues_a_token_that_validates_against_the_configured_parameters()
     {
-        var response = CreateIssuer().Issue("alice");
+        // Arrange
+        TokenResponse response = CreateIssuer().Issue("alice");
 
-        var parameters = new TokenValidationParameters
+        TokenValidationParameters parameters = new()
         {
             ValidIssuer = Options.Issuer,
             ValidAudience = Options.Audience,
@@ -37,8 +38,10 @@ public class DevTokenIssuerTests
             ClockSkew = TimeSpan.FromSeconds(5),
         };
 
-        var validation = await new JsonWebTokenHandler().ValidateTokenAsync(response.AccessToken, parameters);
+        // Act
+        TokenValidationResult validation = await new JsonWebTokenHandler().ValidateTokenAsync(response.AccessToken, parameters);
 
+        // Assert
         using (new AssertionScope())
         {
             response.TokenType.Should().Be("Bearer");
@@ -51,11 +54,14 @@ public class DevTokenIssuerTests
     [Test]
     public void Expiry_is_now_plus_the_configured_lifetime()
     {
-        var fixedNow = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
-        var issuer = CreateIssuer(new FixedTimeProvider(fixedNow));
+        // Arrange
+        DateTimeOffset fixedNow = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        DevTokenIssuer issuer = CreateIssuer(new FixedTimeProvider(fixedNow));
 
-        var response = issuer.Issue("bob");
+        // Act
+        TokenResponse response = issuer.Issue("bob");
 
+        // Assert
         response.ExpiresAtUtc.Should().Be(fixedNow.AddMinutes(30));
     }
 

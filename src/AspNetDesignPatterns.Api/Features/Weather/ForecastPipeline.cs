@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using AspNetDesignPatterns.Api.Shared.Pipeline;
 
 using Microsoft.Extensions.Options;
@@ -29,7 +31,7 @@ internal sealed class ClampForecastWindowStep(IOptions<WeatherOptions> options)
             // Do not call next: the rest of the pipeline is skipped.
             return Task.FromResult(Result.Failure(Error.Validation(
                 "Weather.ForecastWindowTooLarge",
-                $"At most {options.Value.MaxForecastDays} days can be requested.")));
+                $"At most {options.Value.MaxForecastDays.ToString(CultureInfo.InvariantCulture)} days can be requested.")));
         }
 
         return next(cancellationToken);

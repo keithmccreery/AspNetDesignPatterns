@@ -43,7 +43,7 @@ public static class ResultHttpExtensions
             title: error.Type.ToTitle(),
             detail: error.Message,
             statusCode: error.Type.ToStatusCode(),
-            extensions: new Dictionary<string, object?> { ["errorCode"] = error.Code });
+            extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["errorCode"] = error.Code });
     }
 
     /// <summary>Bridges a non-generic <see cref="Result"/> to a Minimal API return value.</summary>

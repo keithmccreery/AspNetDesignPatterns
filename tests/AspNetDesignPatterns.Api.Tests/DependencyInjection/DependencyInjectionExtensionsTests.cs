@@ -50,12 +50,15 @@ public class DependencyInjectionExtensionsTests
     [Test]
     public void AddEndpoints_registers_every_IEndpoint_as_transient_without_duplicates()
     {
+        // Arrange
         ServiceCollection services = new();
 
+        // Act
         services.AddEndpoints(ThisAssembly);
         services.AddEndpoints(ThisAssembly); // idempotent: TryAddEnumerable
 
-        var endpoints = services.BuildServiceProvider().GetServices<IEndpoint>().ToList();
+        // Assert
+        List<IEndpoint> endpoints = services.BuildServiceProvider().GetServices<IEndpoint>().ToList();
 
         using (new AssertionScope())
         {
@@ -69,23 +72,29 @@ public class DependencyInjectionExtensionsTests
     [Test]
     public void AddDependencies_invokes_each_IDependency_module()
     {
+        // Arrange
         ServiceCollection services = new();
 
+        // Act
         services.AddDependencies(ThisAssembly);
 
+        // Assert
         services.BuildServiceProvider().GetService<Marker>().Should().NotBeNull();
     }
 
     [Test]
     public void AddRequestHandlers_registers_closed_handler_interfaces_as_scoped()
     {
+        // Arrange
         ServiceCollection services = new();
 
+        // Act
         services.AddRequestHandlers(ThisAssembly);
 
+        // Assert
         using (new AssertionScope())
         {
-            var handler = services.BuildServiceProvider().GetService<IRequestHandler<Ping, int>>();
+            IRequestHandler<Ping, int>? handler = services.BuildServiceProvider().GetService<IRequestHandler<Ping, int>>();
             handler.Should().BeOfType<PingHandler>();
             services.First(d => d.ServiceType == typeof(IRequestHandler<Ping, int>)).Lifetime
                 .Should().Be(ServiceLifetime.Scoped);

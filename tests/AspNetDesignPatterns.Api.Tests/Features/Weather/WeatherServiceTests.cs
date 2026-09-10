@@ -22,6 +22,7 @@ public class WeatherServiceTests
     [Test]
     public async Task Maps_the_upstream_payload_to_the_api_contract()
     {
+        // Arrange
         _client.GetForecastAsync(52.5, 13.4, 2, Arg.Any<CancellationToken>()).Returns(new OpenMeteoForecast(
             52.5, 13.4, "UTC",
             new OpenMeteoDaily(
@@ -30,8 +31,10 @@ public class WeatherServiceTests
                 [10.4, 11.9],
                 [0.0, 2.5])));
 
+        // Act
         Result<ForecastResponse> result = await CreateService().GetForecastAsync(Request, CancellationToken.None);
 
+        // Assert
         using (new AssertionScope())
         {
             result.IsSuccess.Should().BeTrue();
@@ -44,10 +47,13 @@ public class WeatherServiceTests
     [Test]
     public async Task Returns_NotFound_when_the_provider_has_no_data()
     {
+        // Arrange
         _client.GetForecastAsync(default, default, default, default).ReturnsForAnyArgs((OpenMeteoForecast?) null);
 
+        // Act
         Result<ForecastResponse> result = await CreateService().GetForecastAsync(Request, CancellationToken.None);
 
+        // Assert
         result.IsFailure.Should().BeTrue();
         result.Error.Type.Should().Be(ErrorType.NotFound);
     }
@@ -55,11 +61,14 @@ public class WeatherServiceTests
     [Test]
     public async Task Converts_a_client_exception_into_an_upstream_error()
     {
+        // Arrange
         _client.GetForecastAsync(default, default, default, default)
             .ThrowsAsyncForAnyArgs(new WeatherClientException("boom", new HttpRequestException()));
 
+        // Act
         Result<ForecastResponse> result = await CreateService().GetForecastAsync(Request, CancellationToken.None);
 
+        // Assert
         using (new AssertionScope())
         {
             result.IsFailure.Should().BeTrue();

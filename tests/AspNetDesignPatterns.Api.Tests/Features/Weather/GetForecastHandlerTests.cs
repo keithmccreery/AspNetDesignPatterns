@@ -35,12 +35,15 @@ public class GetForecastHandlerTests
     [Test]
     public async Task Runs_the_pipeline_and_rounds_temperatures()
     {
+        // Arrange
         _client.GetForecastAsync(default, default, default, default).ReturnsForAnyArgs(new OpenMeteoForecast(
             1, 2, "UTC",
             new OpenMeteoDaily([new DateOnly(2026, 9, 9)], [20.148], [10.052], [0.0])));
 
+        // Act
         Result<ForecastResponse> result = await CreateHandler().HandleAsync(new GetForecastRequest(1, 2, 1), CancellationToken.None);
 
+        // Assert
         using (new AssertionScope())
         {
             result.IsSuccess.Should().BeTrue();
@@ -52,9 +55,11 @@ public class GetForecastHandlerTests
     [Test]
     public async Task Fails_validation_when_the_window_exceeds_the_configured_maximum()
     {
+        // Arrange & Act
         Result<ForecastResponse> result = await CreateHandler(maxForecastDays: 3)
             .HandleAsync(new GetForecastRequest(1, 2, 10), CancellationToken.None);
 
+        // Assert
         using (new AssertionScope())
         {
             result.IsFailure.Should().BeTrue();

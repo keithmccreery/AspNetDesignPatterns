@@ -15,10 +15,13 @@ public class ResultLoggingExtensionsTests
     [Test]
     public void LogOnFailure_logs_once_at_Error_and_returns_the_result_unchanged()
     {
-        var result = Result.Failure<int>(Error.NotFound("X.Missing", "not here"));
+        // Arrange
+        Result<int> result = Result.Failure<int>(Error.NotFound("X.Missing", "not here"));
 
-        var returned = result.LogOnFailure(_logger, operation: "FindWidget");
+        // Act
+        Result<int> returned = result.LogOnFailure(_logger, operation: "FindWidget");
 
+        // Assert
         using (new AssertionScope())
         {
             returned.Should().BeSameAs(result);
@@ -30,20 +33,25 @@ public class ResultLoggingExtensionsTests
     [Test]
     public void LogOnFailure_is_a_no_op_for_a_success()
     {
+        // Arrange & Act
         Result.Success(1).LogOnFailure(_logger);
 
+        // Assert
         _logger.Entries.Should().BeEmpty();
     }
 
     [Test]
     public void LogOnFailure_logs_the_attached_exception_and_context_separately()
     {
-        var error = Error.Upstream("Weather.Down", "unavailable")
+        // Arrange
+        Error error = Error.Upstream("Weather.Down", "unavailable")
             .WithException(new HttpRequestException("no route"))
             .WithContext(new { City = "Berlin" });
 
+        // Act
         Result.Failure<int>(error).LogOnFailure(_logger, operation: "GetForecast");
 
+        // Assert
         using (new AssertionScope())
         {
             _logger.Entries.Should().HaveCount(2);
@@ -55,9 +63,11 @@ public class ResultLoggingExtensionsTests
     [Test]
     public void LogOnSuccess_logs_at_the_requested_level_only_for_a_success()
     {
+        // Arrange & Act
         Result.Success(1).LogOnSuccess(_logger, LogLevel.Debug, operation: "Save");
         Result.Failure<int>(Error.Failure("E", "e")).LogOnSuccess(_logger);
 
+        // Assert
         using (new AssertionScope())
         {
             _logger.Entries.Should().ContainSingle();
@@ -68,17 +78,21 @@ public class ResultLoggingExtensionsTests
     [Test]
     public void LogResult_routes_success_and_failure_to_the_right_level()
     {
+        // Arrange & Act
         Result.Success(1).LogResult(_logger, operation: "A");
         Result.Failure<int>(Error.Failure("E", "e")).LogResult(_logger, operation: "B");
 
+        // Assert
         _logger.Entries.Select(e => e.Level).Should().Equal(LogLevel.Information, LogLevel.Error);
     }
 
     [Test]
     public void LogError_includes_the_caller_site()
     {
+        // Arrange & Act
         Result.Failure<int>(Error.Failure("E.Code", "msg")).LogError(_logger);
 
+        // Assert
         _logger.Entries[0].Message.Should()
             .Contain(nameof(LogError_includes_the_caller_site))
             .And.Contain("E.Code");
@@ -87,10 +101,13 @@ public class ResultLoggingExtensionsTests
     [Test]
     public async Task LogOnFailureAsync_awaits_then_logs()
     {
-        var task = Task.FromResult(Result.Failure<int>(Error.Failure("E", "e")));
+        // Arrange
+        Task<Result<int>> task = Task.FromResult(Result.Failure<int>(Error.Failure("E", "e")));
 
+        // Act
         await task.LogOnFailureAsync(_logger, operation: "AsyncOp");
 
+        // Assert
         _logger.Entries.Should().ContainSingle(e => e.Message.Contains("AsyncOp"));
     }
 

@@ -32,8 +32,10 @@ public class AuthExtensionsTests
     [Test]
     public void Registers_the_dev_token_issuer_and_a_TimeProvider()
     {
-        using var provider = BuildProvider();
+        // Arrange & Act
+        using ServiceProvider provider = BuildProvider();
 
+        // Assert
         using (new AssertionScope())
         {
             provider.GetService<DevTokenIssuer>().Should().NotBeNull();
@@ -44,11 +46,14 @@ public class AuthExtensionsTests
     [Test]
     public async Task Registers_the_weather_read_policy_requiring_the_scope_claim()
     {
-        using var provider = BuildProvider();
-        var policyProvider = provider.GetRequiredService<IAuthorizationPolicyProvider>();
+        // Arrange
+        using ServiceProvider provider = BuildProvider();
+        IAuthorizationPolicyProvider policyProvider = provider.GetRequiredService<IAuthorizationPolicyProvider>();
 
-        var policy = await policyProvider.GetPolicyAsync(AuthorizationPolicies.WeatherRead);
+        // Act
+        AuthorizationPolicy? policy = await policyProvider.GetPolicyAsync(AuthorizationPolicies.WeatherRead);
 
+        // Assert
         using (new AssertionScope())
         {
             policy.Should().NotBeNull();
@@ -61,11 +66,14 @@ public class AuthExtensionsTests
     [Test]
     public void Configures_bearer_token_validation_from_JwtOptions()
     {
-        using var provider = BuildProvider();
+        // Arrange
+        using ServiceProvider provider = BuildProvider();
 
-        var bearer = provider.GetRequiredService<IOptionsMonitor<JwtBearerOptions>>()
+        // Act
+        JwtBearerOptions bearer = provider.GetRequiredService<IOptionsMonitor<JwtBearerOptions>>()
             .Get(JwtBearerDefaults.AuthenticationScheme);
 
+        // Assert
         using (new AssertionScope())
         {
             bearer.TokenValidationParameters.ValidIssuer.Should().Be("iss");
@@ -80,7 +88,7 @@ public class JwtOptionsTests
 {
     private static List<ValidationResult> Validate(JwtOptions options)
     {
-        var results = new List<ValidationResult>();
+        List<ValidationResult> results = new();
         Validator.TryValidateObject(options, new ValidationContext(options), results, validateAllProperties: true);
         return results;
     }
@@ -88,6 +96,7 @@ public class JwtOptionsTests
     [Test]
     public void A_fully_populated_options_object_is_valid()
     {
+        // Arrange & Act & Assert
         Validate(new JwtOptions
         {
             SigningKey = new string('k', 32),
@@ -100,6 +109,7 @@ public class JwtOptionsTests
     [Test]
     public void A_short_signing_key_is_rejected()
     {
+        // Arrange & Act & Assert
         Validate(new JwtOptions { SigningKey = "too-short", Issuer = "i", Audience = "a" })
             .Should().Contain(r => r.MemberNames.Contains(nameof(JwtOptions.SigningKey)));
     }
@@ -108,6 +118,7 @@ public class JwtOptionsTests
     [TestCase(1441)]
     public void An_out_of_range_token_lifetime_is_rejected(int minutes)
     {
+        // Arrange & Act & Assert
         Validate(new JwtOptions
         {
             SigningKey = new string('k', 32),
