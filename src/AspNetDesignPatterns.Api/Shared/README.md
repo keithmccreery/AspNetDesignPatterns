@@ -10,6 +10,7 @@ here knows about a specific feature. Each folder has its own README.
 | [`FluentValidations/`](FluentValidations/README.md) | Request validation at the HTTP edge and inside services | `ValidateRequest<T>()`, `IValidator<T>.ValidateAsResult()` |
 | [`Logging/`](Logging/README.md) | CWE-117 log-injection hardening for Serilog | `ControlCharacterSanitizingEnricher` |
 | [`Auth/`](Auth/README.md) | JWT bearer auth, authorization policies, dev-token endpoint | `AddJwtAuth()` |
+| [`HealthChecks/`](HealthChecks/README.md) | Liveness + readiness probes, tag-split, custom JSON writer | `MapAppHealthChecks()` |
 | [`Configuration/`](Configuration/README.md) | "Where/how am I running" view of the environment | `AppEnvironment` |
 | [`OpenApi/`](OpenApi/README.md) | OpenAPI document + Scalar UI + JWT security scheme | `MapApiReference()` |
 | [`Handlers/`](Handlers/README.md) | The `IRequestHandler<TRequest, TResponse>` abstraction | `IRequestHandler<,>` |

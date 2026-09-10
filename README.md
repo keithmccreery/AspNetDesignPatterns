@@ -35,6 +35,7 @@ Then:
 
 - **Scalar UI**: <http://localhost:5139/scalar>
 - **OpenAPI doc**: <http://localhost:5139/openapi/v1.json>
+- **Health**: <http://localhost:5139/health/live> and <http://localhost:5139/health/ready>
 - Get a token: `POST /api/v1/auth/token` with body `{ "subject": "me" }` (Development only)
 - Call the feature: `GET /api/v1/weather/forecast?latitude=52.52&longitude=13.40&days=3`
   with header `Authorization: Bearer <token>`
@@ -109,6 +110,7 @@ them.
 | **`.env` files** | `DotNetEnv` loads `.env` into environment variables before configuration is built. | `Program.cs`, [`.env.example`](src/AspNetDesignPatterns.Api/.env.example) |
 | **Environment model** | `AppEnvironment` — a small "where/how am I running" view (env name, containerized) used for Kestrel and Scalar gating. | [`Shared/Configuration/AppEnvironment.cs`](src/AspNetDesignPatterns.Api/Shared/Configuration/AppEnvironment.cs) |
 | **AuthN / AuthZ** | JWT bearer, named policies (`weather:read` scope), a Development-only dev-token endpoint. | [`Shared/Auth/`](src/AspNetDesignPatterns.Api/Shared/Auth) |
+| **Health checks** | `/health/live` (no checks) and `/health/ready` (checks tagged `ready`), split by intent, with a small custom JSON writer. Checks self-register from the owning slice. | [`Shared/HealthChecks/`](src/AspNetDesignPatterns.Api/Shared/HealthChecks), [`Features/Weather/WeatherProviderHealthCheck.cs`](src/AspNetDesignPatterns.Api/Features/Weather/WeatherProviderHealthCheck.cs) |
 | **DI graph validation** | `UseDefaultServiceProvider(ValidateOnBuild = true, ValidateScopes = true)` — startup fails on a mis-wired or captive dependency. | `Program.cs` |
 
 For a narrated walk-through of how a single request touches all of the above, read

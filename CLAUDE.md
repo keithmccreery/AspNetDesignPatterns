@@ -13,7 +13,7 @@ and consistency matter more than cleverness. It grows one vertical-slice feature
 
 ```bash
 dotnet build                                  # analyzers run here; compiler warnings are errors
-dotnet test                                   # NUnit; 113 tests
+dotnet test                                   # NUnit; 122 tests
 dotnet format --verify-no-changes             # style + whitespace gate (CI)
 dotnet format                                 # apply style fixes
 dotnet run --project src/AspNetDesignPatterns.Api   # needs src/.../.env (copy .env.example)
@@ -23,7 +23,8 @@ dotnet test --filter "FullyQualifiedName~ResultCompositionTests"
 ```
 
 Running the app: copy `src/AspNetDesignPatterns.Api/.env.example` → `.env`, set
-`Jwt__SigningKey` (≥32 chars). Scalar UI at `/scalar`, OpenAPI at `/openapi/v1.json`.
+`Jwt__SigningKey` (≥32 chars). Scalar UI at `/scalar`, OpenAPI at `/openapi/v1.json`,
+probes at `/health/live` + `/health/ready`.
 `GET /api/v1/weather/forecast` proxies the live open-meteo API (needs network); tests fake it.
 
 ## Architecture
@@ -31,6 +32,8 @@ Running the app: copy `src/AspNetDesignPatterns.Api/.env.example` → `.env`, se
 - **Vertical slices** under `Features/<Name>/` — each owns its endpoint, request+validator,
   response DTO, handler, service, client, options, pipeline steps.
 - **`Shared/`** — cross-cutting building blocks, one folder per concern, each with a README.
+  Infrastructure that is genuinely cross-cutting (auth, OpenAPI, health checks) *is* wired in
+  `Program.cs`; only *feature* registration goes through the reflection scans / `IDependency`.
 - **`DependencyInjection/`** — reflection-registration plumbing (see its README).
 - **Request flow**: endpoint (thin HTTP adapter) → `IRequestHandler<TReq,TRes>` → optional
   `Pipeline<TContext>` → service (returns `Result<T>`) → typed client (may throw).
@@ -94,7 +97,8 @@ override block — a test name is a sentence, and test fixtures use invariant li
 - Integration tests: one shared `WeatherApiFactory` owned by `GlobalTestSetup` (`[SetUpFixture]`)
   — Serilog's two-stage init freezes the static logger on host build, so a single host keeps
   it deterministic.
-- `tests/…/TestSupport/` holds shared doubles (`FakeHostEnvironment`, `ManageEnvironmentVariables`).
+- `tests/…/TestSupport/` holds shared doubles (`FakeHostEnvironment`, `ManageEnvironmentVariables`,
+  `StubHttpMessageHandler`).
 
 ## When adding a feature
 

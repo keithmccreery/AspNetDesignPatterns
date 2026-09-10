@@ -8,6 +8,7 @@ using Asp.Versioning.OpenApi;
 using AspNetDesignPatterns.Api.DependencyInjection;
 using AspNetDesignPatterns.Api.Shared.Auth;
 using AspNetDesignPatterns.Api.Shared.Configuration;
+using AspNetDesignPatterns.Api.Shared.HealthChecks;
 using AspNetDesignPatterns.Api.Shared.Logging;
 using AspNetDesignPatterns.Api.Shared.OpenApi;
 
@@ -106,6 +107,10 @@ builder.Services
 builder.Services.AddJwtAuth();
 builder.Services.AddHttpContextAccessor();
 
+// Health-check services. Individual checks self-register from the slice that owns them
+// (e.g. Features/Weather/WeatherDependencies); the two probes are mapped by MapAppHealthChecks().
+builder.Services.AddHealthChecks();
+
 // FluentValidation validators — MUST be registered before AddSettings() so SettingsBase<T>
 // can detect them and choose the FluentValidation path over DataAnnotations.
 builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly, includeInternalTypes: true);
@@ -130,6 +135,9 @@ app.UseAuthorization();
 
 // OpenAPI document at /openapi/v1.json; Scalar UI at /scalar (Development only).
 app.MapApiReference();
+
+// Liveness + readiness probes at /health/live and /health/ready (root, unversioned, anonymous).
+app.MapAppHealthChecks();
 
 // All feature endpoints live under the versioned group: /api/v1/...
 ApiVersionSet apiVersionSet = app

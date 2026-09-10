@@ -20,7 +20,8 @@ copy this folder's shape when adding a feature.
 | `OpenMeteoWeatherClient.cs` | Typed `HttpClient` implementation (resilience is applied globally). |
 | `OpenMeteoForecast.cs` | The upstream JSON shape (client boundary only). |
 | `WeatherOptions.cs` | `SettingsBase<WeatherOptions>` — binds the `Weather` section + FluentValidation validator. |
-| `WeatherDependencies.cs` | `IDependency` — registers `WeatherService` and the typed client. |
+| `WeatherProviderHealthCheck.cs` | `IHealthCheck` — readiness probe for open-meteo. Reports `Degraded` (not `Unhealthy`) when it's down, since the endpoint degrades to a 502. |
+| `WeatherDependencies.cs` | `IDependency` — registers `WeatherService`, the typed client, the health-check client (resilience removed), and the `ready`-tagged check. |
 
 ## Request flow
 
@@ -92,6 +93,8 @@ that is the settings-validation pattern working.
   handler (pipeline behaviour) in isolation with a substitute `IWeatherClient`.
 - `tests/…/Integration/WeatherEndpointTests.cs` — the real app in memory: 401 without a
   token, 200 with one, 400 on a bad parameter, 502 when the client throws.
+- `tests/…/Features/Weather/WeatherProviderHealthCheckTests.cs` — the readiness check:
+  Healthy on 2xx, Degraded on an error status or an unreachable host.
 
 ## Adding a new feature slice
 

@@ -1,8 +1,10 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 
 using AspNetDesignPatterns.Api.Features.Weather;
 using AspNetDesignPatterns.Api.Shared.Auth;
+using AspNetDesignPatterns.Api.Tests.TestSupport;
 
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -45,6 +47,11 @@ public sealed class WeatherApiFactory : WebApplicationFactory<Program>
         {
             services.RemoveAll<IWeatherClient>();
             services.AddSingleton(WeatherClient);
+
+            // Keep the weather readiness probe (WeatherProviderHealthCheck) off the network and
+            // deterministic — it answers 200 so /health/ready is reproducibly Healthy.
+            services.AddHttpClient<WeatherProviderHealthCheck>()
+                .ConfigurePrimaryHttpMessageHandler(() => new StubHttpMessageHandler(HttpStatusCode.OK));
         });
     }
 
