@@ -371,6 +371,19 @@ dotnet_diagnostic.EXTEXP0001.severity = suggestion
 # SA1600: Elements should be documented -- test classes/methods aren't public API and don't need XML doc comments.
 dotnet_diagnostic.SA1600.severity = none
 
+# XML-doc completeness / style: test types aren't public API. SA1600 (above) waives "must be
+# documented"; these waive the follow-on rules for the doc comments that *are* written on
+# fixtures and helpers -- filling in every <param>/<typeparam>/<returns> or rephrasing a
+# property summary to start with "Gets" adds nothing a reader of a test needs.
+dotnet_diagnostic.RCS1141.severity = none   # add <param> element to documentation comment
+dotnet_diagnostic.RCS1142.severity = none   # add <typeparam> element to documentation comment
+dotnet_diagnostic.SA1611.severity = none    # element parameter documentation missing
+dotnet_diagnostic.SA1615.severity = none    # element return value documentation missing
+dotnet_diagnostic.SA1618.severity = none    # generic type parameter documentation missing
+dotnet_diagnostic.SA1623.severity = none    # property summary must begin with 'Gets'/'Sets'
+dotnet_diagnostic.MA0219.severity = none    # 'language' attribute on a <code>/<c> element
+dotnet_diagnostic.MA0154.severity = none    # use <see langword="…"/> in XML comments
+
 # CA1515: Consider making public types internal -- correct in spirit, but MSTest test classes/methods need to
 # stay public for discovery, and a Release build already excludes test projects entirely (see the .sln), so
 # this rule has no real target to act on here regardless.

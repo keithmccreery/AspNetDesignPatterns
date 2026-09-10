@@ -82,8 +82,10 @@ Promoted to `warning` (see the `.editorconfig` block for the full list): the Asy
 VSTHRD async-correctness set, `MA0040`/`MA0079` (flow the `CancellationToken`), `MA0002`
 (explicit `StringComparer`), `MA0076` (no implicit culture `ToString`), and `VSTHRD200`
 (`Async` suffix). `VSTHRD200`, `MA0002`, `MA0076` are turned back off in the test-project
-override block — a test name is a sentence, and test fixtures use invariant literals.
-`IDE0058` is off globally (fluent `.Should()` / DI chains, all noise). The build and
+override block — a test name is a sentence, and test fixtures use invariant literals. The
+same block also silences the XML-doc completeness/style family (`RCS1141`, `SA1611`,
+`SA1623`, `MA0219`, …) since test types aren't public API. `IDE0058` is off globally
+(fluent `.Should()` / DI chains, all noise). The build and
 `dotnet format analyzers --severity warn` are both expected to be clean.
 
 ## Tests
