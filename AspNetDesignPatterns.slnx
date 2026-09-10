@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AspNetDesignPatterns.Api/AspNetDesignPatterns.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AspNetDesignPatterns.Api.Tests/AspNetDesignPatterns.Api.Tests.csproj" />
+  </Folder>
+</Solution>

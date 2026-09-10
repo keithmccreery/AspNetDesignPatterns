@@ -1,0 +1,36 @@
+# Normalize line endings: Git stores text with LF, checks out native on Windows.
+* text=auto
+
+# Explicitly declare text files that should always be normalized to LF.
+*.cs             text diff=csharp
+*.csproj         text
+*.sln            text eol=crlf
+*.slnx           text
+*.props          text
+*.targets        text
+*.json           text
+*.config         text
+*.md             text
+*.yml            text
+*.yaml           text
+*.xml            text
+*.editorconfig   text
+*.sh             text eol=lf
+*.ps1            text eol=crlf
+*.cmd            text eol=crlf
+*.bat            text eol=crlf
+Dockerfile       text eol=lf
+
+# Binary files that Git must never touch.
+*.png            binary
+*.jpg            binary
+*.jpeg           binary
+*.gif            binary
+*.ico            binary
+*.pdf            binary
+*.snk            binary
+*.dll            binary
+*.exe            binary
+
+# Collapse generated files in diffs and language stats.
+*.Designer.cs    linguist-generated=true
