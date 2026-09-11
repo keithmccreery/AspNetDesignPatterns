@@ -43,7 +43,14 @@ public static class AuthorizationExtensions
                 }
 
                 logger.LogInformation("Authorization configured with {PolicyCount} named policies", settings.Policies.Count);
-            });
+            })
+            // No IValidateOptions<AuthorizationOptions> is registered — there's nothing to
+            // validate beyond the Configure<> callback itself — but ValidateOnStart() still
+            // forces that callback (and any malformed policy it can throw building, e.g. a
+            // policy with no requirements at all) to run at startup, explicitly, rather than
+            // relying on UseDefaultServiceProvider(ValidateOnBuild: true) to force-resolve it
+            // as a side effect. Matches the same guarantee every SettingsBase<T> makes.
+            .ValidateOnStart();
 
         return services;
     }

@@ -151,8 +151,10 @@ app.UseCors(CorsExtensions.PolicyName);
 app.UseAuthentication();
 app.UseAuthorization();
 
-// OpenAPI document at /openapi/v1.json; Scalar UI at /scalar (Development only).
-app.MapApiReference();
+// OpenAPI document at /openapi/v1.json; Scalar UI at /scalar (Development only). Title/theme
+// are this app's own branding, passed in rather than baked into KAM.Common — the library has
+// no identity of its own to lend the UI.
+app.MapApiReference(title: "AspNetDesignPatterns API", theme: "Mars");
 
 // Liveness + readiness probes at /health/live and /health/ready (root, unversioned, anonymous).
 app.MapAppHealthChecks();

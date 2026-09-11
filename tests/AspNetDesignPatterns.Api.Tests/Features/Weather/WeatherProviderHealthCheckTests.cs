@@ -93,6 +93,23 @@ public class WeatherProviderHealthCheckTests
     }
 
     [Test]
+    public async Task Concurrent_probes_racing_the_cache_share_a_single_outbound_call()
+    {
+        // Arrange — GetOrCreateAsync holds a per-key lock across the factory; a bare
+        // TryGetValue + Set pair would let a burst of requests each miss the cache and fire
+        // their own concurrent probe instead of sharing one.
+        StubHttpMessageHandler handler = new(HttpStatusCode.OK);
+        IMemoryCache cache = new MemoryCache(new MemoryCacheOptions());
+        WeatherProviderHealthCheck check = CreateCheck(handler, cache);
+
+        // Act
+        await Task.WhenAll(Enumerable.Range(0, 20).Select(_ => check.CheckHealthAsync(Context, CancellationToken.None)));
+
+        // Assert
+        handler.CallCount.Should().Be(1);
+    }
+
+    [Test]
     public async Task A_fresh_probe_can_still_call_the_provider_once_the_cache_entry_is_gone()
     {
         // Arrange — two independently-scoped checks (the typed client is transient) sharing no

@@ -25,19 +25,17 @@ internal sealed class WeatherProviderHealthCheck(HttpClient httpClient, IMemoryC
 
     private static readonly TimeSpan CacheDuration = TimeSpan.FromSeconds(15);
 
-    public async Task<HealthCheckResult> CheckHealthAsync(
+    public Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
-        CancellationToken cancellationToken = default)
-    {
-        if (cache.TryGetValue(CACHE_KEY, out HealthCheckResult cached))
+        CancellationToken cancellationToken = default) =>
+        cache.GetOrCreateAsync(CACHE_KEY, async entry =>
         {
-            return cached;
-        }
-
-        HealthCheckResult result = await ProbeAsync(cancellationToken);
-        cache.Set(CACHE_KEY, result, CacheDuration);
-        return result;
-    }
+            // GetOrCreateAsync holds a per-key lock across the factory, unlike a bare
+            // TryGetValue + Set pair — a burst of requests landing as the TTL expires shares
+            // one probe instead of each firing its own concurrent outbound call.
+            entry.AbsoluteExpirationRelativeToNow = CacheDuration;
+            return await ProbeAsync(cancellationToken);
+        });
 
     private async Task<HealthCheckResult> ProbeAsync(CancellationToken cancellationToken)
     {

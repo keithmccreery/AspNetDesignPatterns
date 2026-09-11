@@ -17,7 +17,8 @@ namespace KAM.Common.Tests.OpenApi;
 [TestFixture]
 public class OpenApiExposureTests
 {
-    private static IReadOnlyCollection<string?> MappedRoutePatterns(string environmentName)
+    private static IReadOnlyCollection<string?> MappedRoutePatterns(
+        string environmentName, string title = "API Reference", string theme = "Default")
     {
         WebApplicationBuilder builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
@@ -30,7 +31,7 @@ public class OpenApiExposureTests
             .AddOpenApi();
 
         using WebApplication app = builder.Build();
-        app.MapApiReference();
+        app.MapApiReference(title, theme);
 
         return [.. ((IEndpointRouteBuilder) app).DataSources
             .SelectMany(source => source.Endpoints)
@@ -56,5 +57,27 @@ public class OpenApiExposureTests
             MappedRoutePatterns("Staging").Should().NotContain(p => p != null && p.Contains("scalar", StringComparison.Ordinal));
             MappedRoutePatterns("Production").Should().NotContain(p => p != null && p.Contains("scalar", StringComparison.Ordinal));
         }
+    }
+
+    [Test]
+    public void Accepts_a_caller_supplied_title_and_theme_instead_of_a_hardcoded_one()
+    {
+        // Arrange & Act — KAM.Common has no product identity of its own to bake in (see its
+        // README); MapApiReference must take these from the caller, not hardcode them.
+        Action act = () => MappedRoutePatterns("Development", title: "Custom API", theme: "Purple");
+
+        // Assert
+        act.Should().NotThrow();
+    }
+
+    [Test]
+    public void An_unrecognized_theme_name_falls_back_to_the_default_theme_instead_of_throwing()
+    {
+        // Arrange & Act — theme is a string, not Scalar.AspNetCore.ScalarTheme directly, so a
+        // caller (or a future config-bound value) can hand it an unrecognized name.
+        Action act = () => MappedRoutePatterns("Development", theme: "NotARealTheme");
+
+        // Assert
+        act.Should().NotThrow();
     }
 }

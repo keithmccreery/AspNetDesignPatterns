@@ -20,7 +20,7 @@ applied to a smaller, self-contained concern.
 |---|---|
 | `CorsSettings.cs` | `CorsSettings`, bound from the `Cors` section. |
 | `CorsSettingsValidator.cs` | FluentValidation: `AllowedOrigins` non-empty, and rejects a `"*"` origin combined with `AllowCredentials: true`. |
-| `CorsExtensions.cs` | `AddCorsPolicy()` — registers a single named policy (`CorsExtensions.PolicyName`) configured lazily from `CorsSettings`. |
+| `CorsExtensions.cs` | `AddCorsPolicy()` — registers a single named policy (`CorsExtensions.PolicyName`) configured lazily from `CorsSettings` (`.ValidateOnStart()` forces that at startup, not first use). |
 
 ## Why `"*"` gets special-cased
 

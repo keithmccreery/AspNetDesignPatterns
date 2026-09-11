@@ -30,13 +30,19 @@ public sealed class JwtOptions : SettingsBase<JwtOptions>
     [Range(1, 1440)]
     public int AccessTokenMinutes { get; init; } = 60;
 
-    /// <summary>Whether to validate the token's <c>iss</c> claim against <see cref="Issuer"/>.</summary>
+    /// <summary>
+    /// Whether to validate the token's <c>iss</c> claim against <see cref="Issuer"/>. Defaults
+    /// to <see langword="true"/> for a reason — nothing here warns if a Production
+    /// <c>appsettings.json</c> turns this (or <see cref="ValidateAudience"/> /
+    /// <see cref="ValidateLifetime"/>) off, so treat flipping one outside Development as a
+    /// deliberate, reviewed decision, not a quick unblock.
+    /// </summary>
     public bool ValidateIssuer { get; init; } = true;
 
-    /// <summary>Whether to validate the token's <c>aud</c> claim against <see cref="Audience"/>.</summary>
+    /// <summary>Whether to validate the token's <c>aud</c> claim against <see cref="Audience"/>. See <see cref="ValidateIssuer"/>.</summary>
     public bool ValidateAudience { get; init; } = true;
 
-    /// <summary>Whether to validate the token's <c>exp</c>/<c>nbf</c> claims.</summary>
+    /// <summary>Whether to validate the token's <c>exp</c>/<c>nbf</c> claims. See <see cref="ValidateIssuer"/>.</summary>
     public bool ValidateLifetime { get; init; } = true;
 
     /// <summary>Clock skew tolerance, in seconds, applied when validating lifetime claims.</summary>

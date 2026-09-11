@@ -64,7 +64,12 @@ public static class CorsExtensions
                         policy.AllowCredentials();
                     }
                 });
-            });
+            })
+            // No IValidateOptions<CorsOptions> is registered, but ValidateOnStart() still forces
+            // the Configure<> callback above to run at startup rather than on first use — the
+            // same explicit guarantee every SettingsBase<T> makes, instead of relying on
+            // UseDefaultServiceProvider(ValidateOnBuild: true) to force-resolve it as a side effect.
+            .ValidateOnStart();
 
         return services;
     }

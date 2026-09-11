@@ -39,7 +39,7 @@ without needing a second real feature to hang it off.
 |---|---|
 | `AuthorizationSettings.cs` | `AuthorizationSettings` (bound from the `Authorization` section), plus `DefaultPolicySettings` and `PolicySettings` — the shape one policy takes in config. |
 | `AuthorizationPolicyBuilderExtensions.cs` | `ApplyPolicySettings(...)` — turns one `PolicySettings` (or `DefaultPolicySettings`) into calls on an `AuthorizationPolicyBuilder`. |
-| `AuthorizationExtensions.cs` | `AddPolicyDrivenAuthorization()` — registers `AddAuthorization()`, configures `AuthorizationOptions` lazily from `AuthorizationSettings`, and registers `ValidClientIdHandler`. |
+| `AuthorizationExtensions.cs` | `AddPolicyDrivenAuthorization()` — registers `AddAuthorization()`, configures `AuthorizationOptions` lazily from `AuthorizationSettings` (`.ValidateOnStart()` forces that at startup, not first use), and registers `ValidClientIdHandler`. |
 | `Requirements/ValidClientIdRequirement.cs` | `ValidClientIdRequirement` + `ValidClientIdHandler` — a worked example of a custom `IAuthorizationRequirement`. |
 
 ## Why policy names can't contain `:`
