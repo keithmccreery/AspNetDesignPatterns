@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Net;
 using System.Security.Claims;
 
 using AspNetDesignPatterns.Api.Shared.Auth;
@@ -6,8 +7,12 @@ using AspNetDesignPatterns.Api.Shared.Auth;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Infrastructure;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace AspNetDesignPatterns.Api.Tests.Shared.Auth;
@@ -103,6 +108,43 @@ public class AuthExtensionsTests
             bearer.TokenValidationParameters.ValidAudience.Should().Be("aud");
             bearer.TokenValidationParameters.ValidateLifetime.Should().BeTrue();
         }
+    }
+
+    [Test]
+    public async Task An_endpoint_that_declares_no_auth_intent_requires_authentication_by_default()
+    {
+        // Arrange — a full pipeline, not just DI registration: the fallback policy is a
+        // middleware-level effect. One endpoint deliberately calls neither
+        // .RequireAuthorization(...) nor .AllowAnonymous(), the mistake EndpointAuthorizationTests
+        // (Integration/) catches at the type level; this proves the runtime backstop for it.
+        using IHost host = await new HostBuilder()
+            .ConfigureWebHost(web => web
+                .UseTestServer()
+                .ConfigureServices(services =>
+                {
+                    services.AddRouting();
+                    services.AddLogging();
+                    services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
+                    services.AddSingleton(Microsoft.Extensions.Options.Options.Create(new JwtOptions
+                    {
+                        SigningKey = "fallback-policy-test-signing-key-0123456789",
+                        Issuer = "iss",
+                        Audience = "aud",
+                    }));
+                    services.AddJwtAuth();
+                })
+                .Configure(app => app
+                    .UseRouting()
+                    .UseAuthentication()
+                    .UseAuthorization()
+                    .UseEndpoints(endpoints => endpoints.MapGet("/undeclared", () => "should not be reachable anonymously"))))
+            .StartAsync();
+
+        // Act
+        HttpResponseMessage response = await host.GetTestClient().GetAsync("/undeclared");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 }
 

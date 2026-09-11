@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -51,7 +52,15 @@ public static class AuthExtensions
                 .RequireAuthenticatedUser()
                 .RequireAssertion(context => ScopeClaims.Has(context.User, Scopes.WeatherRead)));
 
-            options.FallbackPolicy = null;
+            // Fail closed: an endpoint that maps without calling .RequireAuthorization(...) or
+            // .AllowAnonymous() requires an authenticated user by default. EndpointAuthorizationTests
+            // already fails the build if any endpoint declares neither explicitly; this is the
+            // runtime backstop for the same rule — if that test is ever skipped, bypassed, or an
+            // endpoint is registered through a path it doesn't walk, the failure mode is "401",
+            // not "silently public".
+            options.FallbackPolicy = new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .Build();
         });
 
         return services;
