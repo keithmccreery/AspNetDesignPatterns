@@ -1,8 +1,10 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/AspNetDesignPatterns.Api/AspNetDesignPatterns.Api.csproj" />
+    <Project Path="src/AspNetDesignPatterns.Api.Shared/AspNetDesignPatterns.Api.Shared.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/AspNetDesignPatterns.Api.Tests/AspNetDesignPatterns.Api.Tests.csproj" />
+    <Project Path="tests/AspNetDesignPatterns.Api.Shared.Tests/AspNetDesignPatterns.Api.Shared.Tests.csproj" />
   </Folder>
 </Solution>

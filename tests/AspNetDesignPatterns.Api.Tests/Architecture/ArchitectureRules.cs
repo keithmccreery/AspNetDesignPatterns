@@ -9,13 +9,17 @@ namespace AspNetDesignPatterns.Api.Tests.Architecture;
 /// roots the rules talk about, and a single assertion that reports <em>which</em> types broke
 /// a rule (NetArchTest's <see cref="TestResult"/> alone just says pass/fail).
 /// </summary>
+/// <remarks>
+/// <see cref="ProductionAssembly"/> is only <c>AspNetDesignPatterns.Api</c> — Features/,
+/// Program.cs, and (still) everything a rule here checks. It does <em>not</em> include
+/// <c>AspNetDesignPatterns.Api.Shared</c> (DependencyInjection/ and Shared/, in the separate
+/// project): a rule that needs to see into that assembly too would need its own
+/// <c>Types.InAssembly</c> query, which none of the current rules do.
+/// </remarks>
 internal static class ArchitectureRules
 {
     public const string RootNamespace = "AspNetDesignPatterns.Api";
     public const string FeaturesNamespace = RootNamespace + ".Features";
-    public const string SharedNamespace = RootNamespace + ".Shared";
-    public const string DependencyInjectionNamespace = RootNamespace + ".DependencyInjection";
-    public const string ResultsNamespace = SharedNamespace + ".Results";
 
     public static readonly Assembly ProductionAssembly = typeof(Program).Assembly;
 

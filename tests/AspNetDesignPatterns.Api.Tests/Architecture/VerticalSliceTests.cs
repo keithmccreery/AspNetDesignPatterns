@@ -3,8 +3,13 @@ using NetArchTest.Rules;
 namespace AspNetDesignPatterns.Api.Tests.Architecture;
 
 /// <summary>
-/// The slice boundaries: a feature is self-contained, and the cross-cutting layers below it
-/// never reach back up into a feature.
+/// The one remaining slice boundary this suite needs to enforce with a test: a feature is
+/// self-contained. "Shared/ and the DependencyInjection plumbing never depend on a feature"
+/// used to be two more rules here, checked the same way — but since both moved to
+/// <c>AspNetDesignPatterns.Api.Shared</c> (a separate project with no reference back to this
+/// one), that dependency is now a compile error, not just a test failure. A rule this suite
+/// can't even express anymore is a stronger guarantee than one it enforces at runtime, so it
+/// was deleted rather than left in place checking nothing (see the Architecture/ README).
 /// </summary>
 [TestFixture]
 public class VerticalSliceTests
@@ -30,31 +35,5 @@ public class VerticalSliceTests
 
         // Assert
         ArchitectureRules.AssertRuleHolds(result, $"{feature} must not reach into another feature slice");
-    }
-
-    [Test]
-    public void Shared_does_not_depend_on_any_feature()
-    {
-        // Arrange & Act
-        TestResult result = ArchitectureRules.InProductionCode()
-            .That().ResideInNamespaceStartingWith(ArchitectureRules.SharedNamespace)
-            .ShouldNot().HaveDependencyOnAny(ArchitectureRules.FeaturesNamespace)
-            .GetResult();
-
-        // Assert
-        ArchitectureRules.AssertRuleHolds(result, "Shared/ is a building block — it cannot know about a feature");
-    }
-
-    [Test]
-    public void DependencyInjection_plumbing_does_not_depend_on_any_feature()
-    {
-        // Arrange & Act
-        TestResult result = ArchitectureRules.InProductionCode()
-            .That().ResideInNamespace(ArchitectureRules.DependencyInjectionNamespace)
-            .ShouldNot().HaveDependencyOnAny(ArchitectureRules.FeaturesNamespace)
-            .GetResult();
-
-        // Assert
-        ArchitectureRules.AssertRuleHolds(result, "the reflection-registration plumbing is generic — it cannot know about a feature");
     }
 }

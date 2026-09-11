@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>AspNetDesignPatterns.Api.Shared.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <!-- CA1707 (underscores) and CA1034 (nested types) are already silenced in .editorconfig;
+         CA1861 fires on the inline [TestCase] literal arrays that are idiomatic in NUnit. -->
+    <NoWarn>$(NoWarn);CA1861</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NUnit" />
+    <PackageReference Include="NUnit3TestAdapter" />
+    <PackageReference Include="NUnit.Analyzers" />
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="NSubstitute" />
+    <!-- A couple of Shared-level tests boot a minimal pipeline directly (WebApplication /
+         TestServer), rather than through WebApplicationFactory<Program>, which lives in the
+         Api project: Shared has no reference to it, on purpose. -->
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+    <PackageReference Include="Asp.Versioning.Http" />
+    <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AspNetDesignPatterns.Api.Shared\AspNetDesignPatterns.Api.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="NUnit.Framework" />
+    <Using Include="AwesomeAssertions" />
+    <Using Include="AwesomeAssertions.Execution" />
+  </ItemGroup>
+
+</Project>

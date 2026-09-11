@@ -12,8 +12,8 @@ and consistency matter more than cleverness. It grows one vertical-slice feature
 ## Commands
 
 ```bash
-dotnet build                                  # analyzers run here; compiler warnings are errors
-dotnet test                                   # NUnit; 182 tests (incl. NetArchTest arch rules)
+dotnet build                                  # builds both src projects; compiler warnings are errors
+dotnet test                                   # NUnit, both test projects; ~180 tests (incl. NetArchTest arch rules)
 dotnet format --verify-no-changes             # style + whitespace gate (CI)
 dotnet format                                 # apply style fixes
 dotnet run --project src/AspNetDesignPatterns.Api   # needs src/.../.env (copy .env.example)
@@ -29,12 +29,29 @@ probes at `/health/live` + `/health/ready`.
 
 ## Architecture
 
-- **Vertical slices** under `Features/<Name>/` — each owns its endpoint, request+validator,
-  response DTO, handler, service, client, options, pipeline steps.
-- **`Shared/`** — cross-cutting building blocks, one folder per concern, each with a README.
-  Infrastructure that is genuinely cross-cutting (auth, OpenAPI, health checks) *is* wired in
-  `Program.cs`; only *feature* registration goes through the reflection scans / `IDependency`.
-- **`DependencyInjection/`** — reflection-registration plumbing (see its README).
+- **Two projects.** `AspNetDesignPatterns.Api` is the host: `Program.cs` and `Features/`.
+  `AspNetDesignPatterns.Api.Shared` is everything reusable — `DependencyInjection/` and
+  `Shared/` — with **no reference back to the host**, on purpose: it's written to be
+  extractable to its own package later (see its README). `Api` takes a `ProjectReference` on
+  `Api.Shared`; never the other way round.
+- **Vertical slices** under `Features/<Name>/` (in `AspNetDesignPatterns.Api`) — each owns its
+  endpoint, request+validator, response DTO, handler, service, client, options, pipeline steps.
+- **`Shared/`** (in `AspNetDesignPatterns.Api.Shared`) — cross-cutting building blocks, one
+  folder per concern, each with a README. Infrastructure that is genuinely cross-cutting
+  (auth, OpenAPI, health checks) *is* wired in `Program.cs`; only *feature* registration goes
+  through the reflection scans / `IDependency`. A type a reflection scan needs to see from
+  `Program.cs` but that should stay `internal` gets its own registration extension (e.g.
+  `AddGlobalExceptionHandler()`) rather than being made `public` just to be nameable across
+  the project boundary.
+- **`DependencyInjection/`** (in `AspNetDesignPatterns.Api.Shared`) — the reflection-registration
+  conventions, one folder per concern (`Endpoints/`, `Settings/`, `Dependencies/`,
+  `RequestHandlers/`, `ExceptionHandling/`) — see its README. **Every scan takes an explicit
+  `params Assembly[]`, and `Program.cs` always passes both projects' assemblies** — a type
+  can live in either one, and the zero-argument default (`Assembly.GetCallingAssembly()`)
+  only sees the assembly that called it. Missing this is a real, silent failure mode (a
+  settings/endpoint/handler/dependency/step in the assembly *not* passed is never discovered,
+  with no error at startup) — extend the array in `Program.cs`, don't rely on the default,
+  if a third assembly is ever added.
 - **Request flow**: endpoint (thin HTTP adapter) → `IRequestHandler<TReq,TRes>` → optional
   `Pipeline<TContext>` → service (returns `Result<T>`) → typed client (may throw).
 - **`Program.cs`** is a deliberately flat, banner-organized composition root — **do not**
@@ -112,14 +129,22 @@ same block also silences the XML-doc completeness/style family (`RCS1141`, `SA16
 - Integration tests: one shared `WeatherApiFactory` owned by `GlobalTestSetup` (`[SetUpFixture]`)
   — Serilog's two-stage init freezes the static logger on host build, so a single host keeps
   it deterministic.
-- `tests/…/TestSupport/` holds shared doubles (`FakeHostEnvironment`, `ManageEnvironmentVariables`,
-  `StubHttpMessageHandler`).
-- `tests/…/Architecture/` enforces the conventions in this file with NetArchTest (services
-  return `Result`, only clients throw, no cross-feature deps, role types named + sealed).
+- **Two test projects**, mirroring the two src projects — `AspNetDesignPatterns.Api.Tests`
+  references `AspNetDesignPatterns.Api` (and transitively `.Shared`); `AspNetDesignPatterns.Api.Shared.Tests`
+  references only `.Shared`, never the host, for the same reason `.Shared` doesn't reference
+  the host. Each has its own `TestSupport/` — `StubHttpMessageHandler` in the Api one;
+  `FakeHostEnvironment` and `ManageEnvironmentVariables` in the Shared one — split by which
+  project's tests actually use them, not duplicated.
+- `tests/…/Architecture/` (in `AspNetDesignPatterns.Api.Tests`) enforces the conventions in
+  this file with NetArchTest (services return `Result`, only clients throw, no cross-feature
+  deps, role types named + sealed) over the `AspNetDesignPatterns.Api` assembly only — it
+  can't see into `.Shared` without its own `Types.InAssembly` query, and none currently do.
   A failing arch test may mean the rule is too strict — fix whichever is at fault; if a rule
-  can't avoid false positives, delete it with a comment. See its README. Rules that need a
-  running host rather than static analysis (every endpoint declares an auth intent; the
-  OpenAPI/Scalar exposure gating) live as ordinary tests next to what they check instead.
+  can't avoid false positives (or, as happened when `Shared`/`DependencyInjection` moved to
+  their own project, becomes impossible to even express meaningfully), delete it with a
+  comment. See its README. Rules that need a running host rather than static analysis (every
+  endpoint declares an auth intent; the OpenAPI/Scalar exposure gating) live as ordinary tests
+  next to what they check instead.
 
 ## When adding a feature
 

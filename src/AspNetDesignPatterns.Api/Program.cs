@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -38,7 +39,7 @@ AppEnvironment appEnvironment = new(builder.Environment);
 builder.Services.AddSingleton(appEnvironment);
 
 // Global exception handling → RFC 9457 ProblemDetails (see GlobalExceptionHandler).
-builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddGlobalExceptionHandler();
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
 {
     context.ProblemDetails.Instance ??=
@@ -102,7 +103,7 @@ builder.Services
         options.GroupNameFormat = "'v'V";
         options.SubstituteApiVersionInUrl = true;
     })
-    .AddOpenApi(options => options.Document.AddDocumentTransformer<BearerSecuritySchemeTransformer>());
+    .AddOpenApi(options => options.AddBearerSecurityScheme());
 
 builder.Services.AddJwtAuth();
 builder.Services.AddHttpContextAccessor();
@@ -114,17 +115,24 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddHealthChecks();
 builder.Services.AddMemoryCache();
 
+// Both assemblies can define endpoints, settings, dependency modules, handlers, validators,
+// and pipeline steps -- Features/ here, and the shared library's own JwtOptions +
+// DevTokenEndpoint + TokenRequestValidator. Every scan below is given both explicitly; the
+// zero-argument default (the calling assembly, i.e. this one) would silently miss the shared
+// library's half.
+Assembly[] appAssemblies = [typeof(Program).Assembly, typeof(IEndpoint).Assembly];
+
 // FluentValidation validators — MUST be registered before AddSettings() so SettingsBase<T>
 // can detect them and choose the FluentValidation path over DataAnnotations.
-builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly, includeInternalTypes: true);
+builder.Services.AddValidatorsFromAssemblies(appAssemblies, includeInternalTypes: true);
 
 // ── Convention-based registration (one assembly scan each) ──
-builder.Services.AddSettings();          // ISettings  → bind + validate settings
-builder.Services.AddDependencies();      // IDependency → feature-owned DI (typed clients, …)
-builder.Services.AddEndpoints();         // IEndpoint   → Minimal API endpoints
-builder.Services.AddRequestHandlers();   // IRequestHandler<,>
-builder.Services.AddPipeline();          // IPipelineFactory
-builder.Services.AddPipelineSteps();     // IPipelineStep<>
+builder.Services.AddSettings(appAssemblies);          // ISettings  → bind + validate settings
+builder.Services.AddDependencies(appAssemblies);      // IDependency → feature-owned DI (typed clients, …)
+builder.Services.AddEndpoints(appAssemblies);         // IEndpoint   → Minimal API endpoints
+builder.Services.AddRequestHandlers(appAssemblies);   // IRequestHandler<,>
+builder.Services.AddPipeline();                       // IPipelineFactory
+builder.Services.AddPipelineSteps(appAssemblies);     // IPipelineStep<>
 
 // ────────────────────────────────  App  ──────────────────────────────
 WebApplication app = builder.Build();

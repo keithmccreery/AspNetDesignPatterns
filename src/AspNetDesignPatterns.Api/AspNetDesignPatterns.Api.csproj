@@ -13,11 +13,9 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
-    <PackageReference Include="Scalar.AspNetCore" />
     <PackageReference Include="Asp.Versioning.Http" />
     <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" />
     <PackageReference Include="Asp.Versioning.OpenApi" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
@@ -26,6 +24,12 @@
     <PackageReference Include="Serilog.Settings.Configuration" />
     <PackageReference Include="Serilog.Sinks.Console" />
     <PackageReference Include="Serilog.Sinks.File" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- DependencyInjection/ and Shared/ live here: see AspNetDesignPatterns.Api.Shared/README.md
+         for why they're a separate project (a future reusable-package boundary). -->
+    <ProjectReference Include="..\AspNetDesignPatterns.Api.Shared\AspNetDesignPatterns.Api.Shared.csproj" />
   </ItemGroup>
 
 </Project>
