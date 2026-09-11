@@ -17,7 +17,7 @@ copy this folder's shape when adding a feature.
 | `ForecastPipeline.cs` | `ForecastContext` + the middleware steps (clamp window → fetch → round). |
 | `WeatherService.cs` | First layer above the client: turns values / nulls / exceptions into `Result<T>`; maps upstream → contract. |
 | `IWeatherClient.cs` | Client abstraction + `WeatherClientException`. The only layer allowed to throw. |
-| `OpenMeteoWeatherClient.cs` | Typed `HttpClient` implementation (resilience is applied globally). |
+| `OpenMeteoWeatherClient.cs` | Typed `HttpClient` implementation (resilience is applied globally). Builds the query with `QueryHelpers.AddQueryString` (URL-encoded, culture-invariant) and validates the daily-forecast shape before returning it, so a malformed-but-parseable payload becomes a `WeatherClientException`, not an unhandled exception three layers up. |
 | `OpenMeteoForecast.cs` | The upstream JSON shape (client boundary only). |
 | `WeatherOptions.cs` | `SettingsBase<WeatherOptions>` — binds the `Weather` section + FluentValidation validator. |
 | `WeatherProviderHealthCheck.cs` | `IHealthCheck` — readiness probe for open-meteo. Reports `Degraded` (not `Unhealthy`) when it's down, since the endpoint degrades to a 502. |
@@ -91,6 +91,11 @@ that is the settings-validation pattern working.
 
 - `tests/…/Features/Weather/` — validator, service (mapping + error translation) and
   handler (pipeline behaviour) in isolation with a substitute `IWeatherClient`.
+- `tests/…/Features/Weather/OpenMeteoWeatherClientTests.cs` — the real client against a fake
+  `HttpMessageHandler`: culture-invariant/URL-encoded query, 400→null, 5xx/transport/JSON
+  failures and a malformed daily-forecast shape → `WeatherClientException`, and caller
+  cancellation propagating **unwrapped** (only a provider-side timeout should become a
+  `WeatherClientException` — both look like `TaskCanceledException` to `HttpClient`).
 - `tests/…/Integration/WeatherEndpointTests.cs` — the real app in memory: 401 without a
   token, 200 with one, 400 on a bad parameter, 502 when the client throws.
 - `tests/…/Features/Weather/WeatherProviderHealthCheckTests.cs` — the readiness check:

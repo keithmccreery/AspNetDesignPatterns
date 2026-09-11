@@ -17,6 +17,11 @@ public interface IWeatherClient
         CancellationToken cancellationToken);
 }
 
-/// <summary>Raised when the upstream weather provider cannot be reached or returns an unusable payload.</summary>
-public sealed class WeatherClientException(string message, Exception innerException)
+/// <summary>
+/// Raised when the upstream weather provider cannot be reached or returns an unusable
+/// payload. <paramref name="innerException"/> is the originating transport/deserialization
+/// failure when there is one; a structurally invalid-but-parseable payload (mismatched or
+/// missing daily arrays) has none, so it is optional.
+/// </summary>
+public sealed class WeatherClientException(string message, Exception? innerException = null)
     : Exception(message, innerException);
