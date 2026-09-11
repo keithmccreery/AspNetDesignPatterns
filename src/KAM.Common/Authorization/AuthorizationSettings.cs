@@ -55,7 +55,7 @@ public sealed class PolicySettings
 
     /// <summary>
     /// OAuth2/OIDC scopes the caller's token must all carry. Checked via
-    /// <see cref="KAM.Common.Auth.ScopeClaims"/>, not <c>RequireClaim("scope", ...)</c> — a real
+    /// <see cref="KAM.Common.Authentication.ScopeClaims"/>, not <c>RequireClaim("scope", ...)</c> — a real
     /// IdP sends one space-delimited <c>scope</c> claim, which <c>RequireClaim</c> only matches
     /// when the claim's value is <em>exactly</em> the required scope.
     /// </summary>

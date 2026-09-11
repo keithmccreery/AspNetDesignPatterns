@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
-namespace KAM.Common.Auth;
+namespace KAM.Common.Authentication;
 
 /// <summary>
 /// Mints signed HS256 JWTs from <see cref="JwtOptions"/>. Used only by the Development-only

@@ -1,6 +1,6 @@
 using FluentValidation;
 
-namespace KAM.Common.Auth;
+namespace KAM.Common.Authentication;
 
 /// <summary>Request body for the Development-only dev-token endpoint.</summary>
 /// <param name="Subject">The user name to embed as the token subject.</param>

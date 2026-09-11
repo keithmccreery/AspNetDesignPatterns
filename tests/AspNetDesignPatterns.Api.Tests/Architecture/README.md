@@ -12,8 +12,8 @@ The conventions in `CLAUDE.md` and the `Shared/` / `Features/` READMEs, enforced
 | `SanityTests.cs` | Guards against a rule passing **vacuously** — every predicate the other fixtures rely on is asserted to match at least one real type. |
 
 Everything in this folder scans `AspNetDesignPatterns.Api` only (see `ArchitectureRules.cs`)
-— it has no visibility into `KAM.Common` (`DependencyInjection/`, `Auth/`, `Results/`, etc., a
-separate project) unless a rule adds its own `Types.InAssembly` query; none currently do.
+— it has no visibility into `KAM.Common` (`DependencyInjection/`, `Authentication/`, `Results/`,
+etc., a separate project) unless a rule adds its own `Types.InAssembly` query; none currently do.
 
 Two rules live outside this folder entirely because they need a running host, not static
 analysis: `tests/AspNetDesignPatterns.Api.Tests/Integration/EndpointAuthorizationTests.cs`

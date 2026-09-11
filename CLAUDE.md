@@ -30,7 +30,7 @@ probes at `/health/live` + `/health/ready`.
 ## Architecture
 
 - **Two projects.** `AspNetDesignPatterns.Api` is the host: `Program.cs` and `Features/`.
-  `KAM.Common` is everything reusable — `DependencyInjection/`, `Auth/`, `Results/`,
+  `KAM.Common` is everything reusable — `DependencyInjection/`, `Authentication/`, `Results/`,
   `Pipeline/`, and the rest of the cross-cutting folders below — with **no reference back to
   the host**, on purpose: it's meant to be reused on real projects, not just this sample (see
   its README for why it's named `KAM.Common` and not something tied to the sample app). `Api`
@@ -38,22 +38,23 @@ probes at `/health/live` + `/health/ready`.
 - **Vertical slices** under `Features/<Name>/` (in `AspNetDesignPatterns.Api`) — each owns its
   endpoint, request+validator, response DTO, handler, service, client, options, pipeline steps.
 - **Cross-cutting building blocks** (in `KAM.Common`) — one top-level folder per concern
-  (`Results/`, `Pipeline/`, `Auth/`, `Authorization/`, `Cors/`, `HealthChecks/`, `OpenApi/`,
-  `Logging/`, `FluentValidations/`, `Configuration/`, `Handlers/`), each with a README.
-  Infrastructure that is genuinely cross-cutting (auth, CORS, OpenAPI, health checks) *is*
-  wired in `Program.cs`; only *feature* registration goes through the reflection scans /
+  (`Results/`, `Pipeline/`, `Authentication/`, `Authorization/`, `Cors/`, `HealthChecks/`,
+  `OpenApi/`, `Logging/`, `FluentValidations/`, `Configuration/`, `Handlers/`), each with a
+  README. Infrastructure that is genuinely cross-cutting (auth, CORS, OpenAPI, health checks)
+  *is* wired in `Program.cs`; only *feature* registration goes through the reflection scans /
   `IDependency`. A type a reflection scan needs to see from `Program.cs` but that should stay
   `internal` gets its own registration extension (e.g. `AddGlobalExceptionHandler()`) rather
   than being made `public` just to be nameable across the project boundary.
-- **`Auth/` vs `Authorization/`** — deliberately separate: `Auth/` is authentication (who the
-  caller is — JWT bearer validation, the dev-token endpoint); `Authorization/` is authorization
-  (what they can do), expressed as **config-driven policies** (`appsettings.json`, not
-  hardcoded C#) so adding or tightening a policy doesn't need a redeploy. Both are wired in
-  `Program.cs` (`AddJwtAuth()` then `AddPolicyDrivenAuthorization()`). See `Authorization/README.md`
-  for a real bug this surfaced: a policy *name* containing `:` doesn't survive
-  `IConfiguration` binding (`:` is its own path separator), so policy names and OAuth2 scope
-  values (which use `:` freely) must stay separate constants — same principle as `Auth/AuthorizationPolicies.cs`
-  already documented, now with a concrete failure mode behind it.
+- **`Authentication/` vs `Authorization/`** — deliberately separate, and deliberately named to
+  say so (not the ambiguous "Auth"): `Authentication/` is who the caller is (JWT bearer
+  validation, the dev-token endpoint); `Authorization/` is what they can do, expressed as
+  **config-driven policies** (`appsettings.json`, not hardcoded C#) so adding or tightening a
+  policy doesn't need a redeploy. Both are wired in `Program.cs` (`AddJwtAuth()` then
+  `AddPolicyDrivenAuthorization()`). See `Authorization/README.md` for a real bug this
+  surfaced: a policy *name* containing `:` doesn't survive `IConfiguration` binding (`:` is its
+  own path separator), so policy names and OAuth2 scope values (which use `:` freely) must stay
+  separate constants — same principle as `Authentication/AuthorizationPolicies.cs` already
+  documented, now with a concrete failure mode behind it.
 - **`DependencyInjection/`** (in `KAM.Common`) — the reflection-registration conventions, one
   folder per concern (`Endpoints/`, `Settings/`, `Dependencies/`, `RequestHandlers/`,
   `ExceptionHandling/`) — see its README. **Every scan takes an explicit

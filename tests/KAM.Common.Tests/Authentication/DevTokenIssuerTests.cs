@@ -1,11 +1,11 @@
 using System.Text;
 
-using KAM.Common.Auth;
+using KAM.Common.Authentication;
 
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
-namespace KAM.Common.Tests.Auth;
+namespace KAM.Common.Tests.Authentication;
 
 [TestFixture]
 public class DevTokenIssuerTests

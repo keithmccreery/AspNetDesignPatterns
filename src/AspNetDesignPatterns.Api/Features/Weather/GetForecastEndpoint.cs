@@ -1,4 +1,4 @@
-using KAM.Common.Auth;
+using KAM.Common.Authentication;
 using KAM.Common.DependencyInjection;
 using KAM.Common.FluentValidations;
 using KAM.Common.Handlers;

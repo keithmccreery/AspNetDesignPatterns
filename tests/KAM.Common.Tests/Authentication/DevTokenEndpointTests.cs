@@ -1,4 +1,4 @@
-using KAM.Common.Auth;
+using KAM.Common.Authentication;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
-namespace KAM.Common.Tests.Auth;
+namespace KAM.Common.Tests.Authentication;
 
 /// <summary>
 /// <see cref="DevTokenEndpoint"/> maps itself only in Development — it reads

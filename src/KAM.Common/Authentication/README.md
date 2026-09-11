@@ -1,4 +1,4 @@
-# Auth
+# Authentication
 
 JWT bearer **authentication** — who the caller is — plus a Development-only endpoint that
 mints tokens so you can exercise secured routes from Scalar or curl without an identity
@@ -64,7 +64,7 @@ app.MapGet("/weather/forecast", Handler)
 
 ## Tests
 
-`tests/KAM.Common.Tests/Auth/` —
+`tests/KAM.Common.Tests/Authentication/` —
 
 - `DevTokenIssuerTests` — issued token validates against the configured parameters; expiry =
   now + lifetime, via a fixed `TimeProvider`.

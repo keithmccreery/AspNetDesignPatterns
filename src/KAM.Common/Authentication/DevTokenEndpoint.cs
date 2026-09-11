@@ -1,7 +1,7 @@
 using KAM.Common.DependencyInjection;
 using KAM.Common.FluentValidations;
 
-namespace KAM.Common.Auth;
+namespace KAM.Common.Authentication;
 
 /// <summary>
 /// Issues a signed JWT for local testing so you can call secured endpoints from Scalar or

@@ -1,13 +1,13 @@
 using System.ComponentModel.DataAnnotations;
 
-using KAM.Common.Auth;
+using KAM.Common.Authentication;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace KAM.Common.Tests.Auth;
+namespace KAM.Common.Tests.Authentication;
 
 [TestFixture]
 public class AuthExtensionsTests

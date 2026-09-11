@@ -10,7 +10,7 @@ using DotNetEnv;
 
 using FluentValidation;
 
-using KAM.Common.Auth;
+using KAM.Common.Authentication;
 using KAM.Common.Authorization;
 using KAM.Common.Configuration;
 using KAM.Common.Cors;

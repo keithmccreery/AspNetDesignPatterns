@@ -1,7 +1,7 @@
 # Authorization
 
 Data-driven authorization policies: what a caller can do, expressed as configuration rather
-than hardcoded C#. Kept separate from [`Auth/`](../Auth/README.md), which handles
+than hardcoded C#. Kept separate from [`Authentication/`](../Authentication/README.md), which handles
 authentication (who the caller is) — the two compose, but neither depends on the other beyond
 `ScopeClaims` (see below).
 
@@ -51,7 +51,7 @@ as a literal string; it becomes *two* nested configuration sections (`weather`, 
 so the dictionary never gets an entry literally named `"weather:read"`, and
 `.RequireAuthorization("weather:read")` fails at request time with
 `AuthorizationPolicy named 'weather:read' was not found` — a real bug hit and fixed while
-building this, not a hypothetical. This is exactly why [`AuthorizationPolicies.WeatherRead`](../Auth/AuthorizationPolicies.cs)
+building this, not a hypothetical. This is exactly why [`AuthorizationPolicies.WeatherRead`](../Authentication/AuthorizationPolicies.cs)
 (the policy *name*, `"WeatherRead"`) and `Scopes.WeatherRead` (the scope *value*,
 `"weather:read"`) are separate constants — the policy name has to avoid `:`, the scope value
 is an OAuth2 convention that uses `:` freely, and conflating them would force a choice that
@@ -63,7 +63,7 @@ breaks one or the other.
 `"weather:read"`. Real identity providers (Entra ID, Auth0, Keycloak, …) emit one
 space-delimited `scope` claim per the OAuth2 spec — e.g. `"weather:read openid profile"` —
 which that check rejects outright. `ApplyPolicySettings` checks `RequiredScopes` via
-[`KAM.Common.Auth.ScopeClaims`](../Auth/README.md) instead, through `RequireAssertion`, so it
+[`KAM.Common.Authentication.ScopeClaims`](../Authentication/README.md) instead, through `RequireAssertion`, so it
 accepts both that standard shape and a discrete claim per scope.
 
 ## Why the fallback policy denies by default

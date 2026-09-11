@@ -5,7 +5,7 @@ using System.Net.Http.Json;
 using AspNetDesignPatterns.Api.Features.Weather;
 using AspNetDesignPatterns.Api.Tests.TestSupport;
 
-using KAM.Common.Auth;
+using KAM.Common.Authentication;
 
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;

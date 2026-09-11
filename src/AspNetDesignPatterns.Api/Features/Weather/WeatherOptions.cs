@@ -10,7 +10,7 @@ namespace AspNetDesignPatterns.Api.Features.Weather;
 /// <remarks>
 /// A <see cref="WeatherOptionsValidator"/> is registered, so <see cref="SettingsBase{T}"/>
 /// validates this with FluentValidation — the primary path (contrast with
-/// <see cref="KAM.Common.Auth.JwtOptions"/>, which has no validator and falls back to DataAnnotations).
+/// <see cref="KAM.Common.Authentication.JwtOptions"/>, which has no validator and falls back to DataAnnotations).
 /// </remarks>
 public sealed class WeatherOptions : SettingsBase<WeatherOptions>
 {

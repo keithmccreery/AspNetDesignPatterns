@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 using KAM.Common.DependencyInjection;
 
-namespace KAM.Common.Auth;
+namespace KAM.Common.Authentication;
 
 /// <summary>
 /// JWT bearer settings, bound from the "Jwt" configuration section. The signing key is a

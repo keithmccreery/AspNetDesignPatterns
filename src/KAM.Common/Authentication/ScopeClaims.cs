@@ -1,6 +1,6 @@
 using System.Security.Claims;
 
-namespace KAM.Common.Auth;
+namespace KAM.Common.Authentication;
 
 /// <summary>
 /// Reads OAuth2/OIDC <c>scope</c> claims. A <c>RequireClaim("scope", value)</c> policy only

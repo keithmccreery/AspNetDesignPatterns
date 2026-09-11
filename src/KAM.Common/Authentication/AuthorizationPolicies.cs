@@ -1,4 +1,4 @@
-namespace KAM.Common.Auth;
+namespace KAM.Common.Authentication;
 
 /// <summary>
 /// Named authorization policies. Endpoints reference these by constant, never by string

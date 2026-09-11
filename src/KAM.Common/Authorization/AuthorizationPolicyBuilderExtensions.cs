@@ -1,4 +1,4 @@
-using KAM.Common.Auth;
+using KAM.Common.Authentication;
 using KAM.Common.Authorization.Requirements;
 
 using Microsoft.AspNetCore.Authorization;

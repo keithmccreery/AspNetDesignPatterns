@@ -1,8 +1,8 @@
 using FluentValidation.TestHelper;
 
-using KAM.Common.Auth;
+using KAM.Common.Authentication;
 
-namespace KAM.Common.Tests.Auth;
+namespace KAM.Common.Tests.Authentication;
 
 [TestFixture]
 public class TokenRequestValidatorTests
