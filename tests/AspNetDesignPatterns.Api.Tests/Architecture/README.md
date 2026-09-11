@@ -12,16 +12,15 @@ The conventions in `CLAUDE.md` and the `Shared/` / `Features/` READMEs, enforced
 | `SanityTests.cs` | Guards against a rule passing **vacuously** — every predicate the other fixtures rely on is asserted to match at least one real type. |
 
 Everything in this folder scans `AspNetDesignPatterns.Api` only (see `ArchitectureRules.cs`)
-— it has no visibility into `AspNetDesignPatterns.Api.Shared` (`DependencyInjection/` and
-`Shared/`, a separate project) unless a rule adds its own `Types.InAssembly` query; none
-currently do.
+— it has no visibility into `KAM.Common` (`DependencyInjection/`, `Auth/`, `Results/`, etc., a
+separate project) unless a rule adds its own `Types.InAssembly` query; none currently do.
 
 Two rules live outside this folder entirely because they need a running host, not static
 analysis: `tests/AspNetDesignPatterns.Api.Tests/Integration/EndpointAuthorizationTests.cs`
 walks the real app's mapped endpoints and requires each one to declare
 `.RequireAuthorization(...)` or `.AllowAnonymous()` explicitly — whether an endpoint called
 one is invisible to a type-level rule; it only shows up in the endpoint metadata built at
-startup. `tests/AspNetDesignPatterns.Api.Shared.Tests/OpenApi/OpenApiExposureTests.cs` is the
+startup. `tests/KAM.Common.Tests/OpenApi/OpenApiExposureTests.cs` is the
 same idea for the Production/Development gating on the OpenAPI document and Scalar UI.
 
 ## Pieces
@@ -46,7 +45,7 @@ leaving it half-enforced:
   reference that namespace.
 - `Shared ⇏ Features` and `DependencyInjection ⇏ Features` were dropped later, for a
   different reason: once `Shared/` and `DependencyInjection/` moved into their own project
-  (`AspNetDesignPatterns.Api.Shared`, no reference back to this one), the rule stopped being
+  (now `KAM.Common`, no reference back to this one), the rule stopped being
   something this suite could even check — the namespaces it queried for no longer exist in
   the assembly it scans. A rule can't fail meaningfully against an empty set; a **compile
   error** if anyone tried to add that reference back is a strictly stronger guarantee than

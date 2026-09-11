@@ -6,16 +6,16 @@ using Asp.Versioning;
 using Asp.Versioning.Builder;
 using Asp.Versioning.OpenApi;
 
-using AspNetDesignPatterns.Api.DependencyInjection;
-using AspNetDesignPatterns.Api.Shared.Auth;
-using AspNetDesignPatterns.Api.Shared.Configuration;
-using AspNetDesignPatterns.Api.Shared.HealthChecks;
-using AspNetDesignPatterns.Api.Shared.Logging;
-using AspNetDesignPatterns.Api.Shared.OpenApi;
-
 using DotNetEnv;
 
 using FluentValidation;
+
+using KAM.Common.Auth;
+using KAM.Common.Configuration;
+using KAM.Common.DependencyInjection;
+using KAM.Common.HealthChecks;
+using KAM.Common.Logging;
+using KAM.Common.OpenApi;
 
 using Serilog;
 
@@ -116,10 +116,9 @@ builder.Services.AddHealthChecks();
 builder.Services.AddMemoryCache();
 
 // Both assemblies can define endpoints, settings, dependency modules, handlers, validators,
-// and pipeline steps -- Features/ here, and the shared library's own JwtOptions +
-// DevTokenEndpoint + TokenRequestValidator. Every scan below is given both explicitly; the
-// zero-argument default (the calling assembly, i.e. this one) would silently miss the shared
-// library's half.
+// and pipeline steps -- Features/ here, and KAM.Common's own JwtOptions + DevTokenEndpoint +
+// TokenRequestValidator. Every scan below is given both explicitly; the zero-argument default
+// (the calling assembly, i.e. this one) would silently miss KAM.Common's half.
 Assembly[] appAssemblies = [typeof(Program).Assembly, typeof(IEndpoint).Assembly];
 
 // FluentValidation validators — MUST be registered before AddSettings() so SettingsBase<T>

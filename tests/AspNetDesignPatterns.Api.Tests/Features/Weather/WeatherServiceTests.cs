@@ -1,5 +1,6 @@
 using AspNetDesignPatterns.Api.Features.Weather;
-using AspNetDesignPatterns.Api.Shared.Results;
+
+using KAM.Common.Results;
 
 using NSubstitute;
 using NSubstitute.ClearExtensions;

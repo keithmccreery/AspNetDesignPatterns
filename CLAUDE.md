@@ -30,22 +30,24 @@ probes at `/health/live` + `/health/ready`.
 ## Architecture
 
 - **Two projects.** `AspNetDesignPatterns.Api` is the host: `Program.cs` and `Features/`.
-  `AspNetDesignPatterns.Api.Shared` is everything reusable — `DependencyInjection/` and
-  `Shared/` — with **no reference back to the host**, on purpose: it's written to be
-  extractable to its own package later (see its README). `Api` takes a `ProjectReference` on
-  `Api.Shared`; never the other way round.
+  `KAM.Common` is everything reusable — `DependencyInjection/`, `Auth/`, `Results/`,
+  `Pipeline/`, and the rest of the cross-cutting folders below — with **no reference back to
+  the host**, on purpose: it's meant to be reused on real projects, not just this sample (see
+  its README for why it's named `KAM.Common` and not something tied to the sample app). `Api`
+  takes a `ProjectReference` on `KAM.Common`; never the other way round.
 - **Vertical slices** under `Features/<Name>/` (in `AspNetDesignPatterns.Api`) — each owns its
   endpoint, request+validator, response DTO, handler, service, client, options, pipeline steps.
-- **`Shared/`** (in `AspNetDesignPatterns.Api.Shared`) — cross-cutting building blocks, one
-  folder per concern, each with a README. Infrastructure that is genuinely cross-cutting
-  (auth, OpenAPI, health checks) *is* wired in `Program.cs`; only *feature* registration goes
-  through the reflection scans / `IDependency`. A type a reflection scan needs to see from
-  `Program.cs` but that should stay `internal` gets its own registration extension (e.g.
-  `AddGlobalExceptionHandler()`) rather than being made `public` just to be nameable across
-  the project boundary.
-- **`DependencyInjection/`** (in `AspNetDesignPatterns.Api.Shared`) — the reflection-registration
-  conventions, one folder per concern (`Endpoints/`, `Settings/`, `Dependencies/`,
-  `RequestHandlers/`, `ExceptionHandling/`) — see its README. **Every scan takes an explicit
+- **Cross-cutting building blocks** (in `KAM.Common`) — one top-level folder per concern
+  (`Results/`, `Pipeline/`, `Auth/`, `HealthChecks/`, `OpenApi/`, `Logging/`,
+  `FluentValidations/`, `Configuration/`, `Handlers/`), each with a README. Infrastructure that
+  is genuinely cross-cutting (auth, OpenAPI, health checks) *is* wired in `Program.cs`; only
+  *feature* registration goes through the reflection scans / `IDependency`. A type a reflection
+  scan needs to see from `Program.cs` but that should stay `internal` gets its own registration
+  extension (e.g. `AddGlobalExceptionHandler()`) rather than being made `public` just to be
+  nameable across the project boundary.
+- **`DependencyInjection/`** (in `KAM.Common`) — the reflection-registration conventions, one
+  folder per concern (`Endpoints/`, `Settings/`, `Dependencies/`, `RequestHandlers/`,
+  `ExceptionHandling/`) — see its README. **Every scan takes an explicit
   `params Assembly[]`, and `Program.cs` always passes both projects' assemblies** — a type
   can live in either one, and the zero-argument default (`Assembly.GetCallingAssembly()`)
   only sees the assembly that called it. Missing this is a real, silent failure mode (a
@@ -62,7 +64,7 @@ probes at `/health/live` + `/health/ready`.
 
 1. **`Result` / `Result<T>` above the client layer.** Services and handlers never throw
    upward; they catch client exceptions and return `Error.Upstream(...).WithException(ex)`.
-   Only the client (HttpClient/DB/SDK) throws. See `Shared/Results/README.md`.
+   Only the client (HttpClient/DB/SDK) throws. See `KAM.Common/Results/README.md`.
 2. **Endpoints return `ProblemDetails`** via `result.ToHttpResult()` — never a bespoke error
    shape.
 3. **No new registration in `Program.cs` per feature.** Add an `IEndpoint`, `IRequestHandler`,
@@ -130,11 +132,11 @@ same block also silences the XML-doc completeness/style family (`RCS1141`, `SA16
   — Serilog's two-stage init freezes the static logger on host build, so a single host keeps
   it deterministic.
 - **Two test projects**, mirroring the two src projects — `AspNetDesignPatterns.Api.Tests`
-  references `AspNetDesignPatterns.Api` (and transitively `.Shared`); `AspNetDesignPatterns.Api.Shared.Tests`
-  references only `.Shared`, never the host, for the same reason `.Shared` doesn't reference
-  the host. Each has its own `TestSupport/` — `StubHttpMessageHandler` in the Api one;
-  `FakeHostEnvironment` and `ManageEnvironmentVariables` in the Shared one — split by which
-  project's tests actually use them, not duplicated.
+  references `AspNetDesignPatterns.Api` (and transitively `KAM.Common`); `KAM.Common.Tests`
+  references only `KAM.Common`, never the host, for the same reason `KAM.Common` doesn't
+  reference the host. Each has its own `TestSupport/` — `StubHttpMessageHandler` in the Api
+  one; `FakeHostEnvironment` and `ManageEnvironmentVariables` in the KAM.Common one — split by
+  which project's tests actually use them, not duplicated.
 - `tests/…/Architecture/` (in `AspNetDesignPatterns.Api.Tests`) enforces the conventions in
   this file with NetArchTest (services return `Result`, only clients throw, no cross-feature
   deps, role types named + sealed) over the `AspNetDesignPatterns.Api` assembly only — it

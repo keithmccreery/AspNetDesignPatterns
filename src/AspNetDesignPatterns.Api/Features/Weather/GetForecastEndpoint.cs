@@ -1,7 +1,7 @@
-using AspNetDesignPatterns.Api.DependencyInjection;
-using AspNetDesignPatterns.Api.Shared.Auth;
-using AspNetDesignPatterns.Api.Shared.FluentValidations;
-using AspNetDesignPatterns.Api.Shared.Handlers;
+using KAM.Common.Auth;
+using KAM.Common.DependencyInjection;
+using KAM.Common.FluentValidations;
+using KAM.Common.Handlers;
 
 namespace AspNetDesignPatterns.Api.Features.Weather;
 

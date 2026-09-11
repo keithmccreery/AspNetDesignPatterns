@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- RootNamespace only affects designer-generated file namespaces here (everything else
+         declares its own), but keeping it set matches dotnet_style_namespace_match_folder for
+         every top-level folder (Auth/, Results/, DependencyInjection/, etc.). -->
+    <RootNamespace>KAM.Common</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- A class library (not Microsoft.NET.Sdk.Web) that uses ASP.NET Core types needs this
+         explicitly: the Web SDK pulls it in implicitly, a plain class library does not. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Kept separate from AspNetDesignPatterns.Api on purpose: this project is meant to be
+         reused sooner rather than later (that's the reason it's named KAM.Common instead of
+         something tied to the sample app), so it never references the host project or a
+         feature. See each folder's README, and DependencyInjection/README.md in particular. -->
+    <InternalsVisibleTo Include="KAM.Common.Tests" />
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" /><!-- NSubstitute -->
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Asp.Versioning.OpenApi" />
+    <PackageReference Include="Scalar.AspNetCore" />
+    <PackageReference Include="Serilog" />
+  </ItemGroup>
+
+</Project>

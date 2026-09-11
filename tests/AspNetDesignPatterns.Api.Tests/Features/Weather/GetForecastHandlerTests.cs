@@ -1,6 +1,7 @@
 using AspNetDesignPatterns.Api.Features.Weather;
-using AspNetDesignPatterns.Api.Shared.Pipeline;
-using AspNetDesignPatterns.Api.Shared.Results;
+
+using KAM.Common.Pipeline;
+using KAM.Common.Results;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;

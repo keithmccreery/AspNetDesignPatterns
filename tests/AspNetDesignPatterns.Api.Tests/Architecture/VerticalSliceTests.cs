@@ -6,8 +6,8 @@ namespace AspNetDesignPatterns.Api.Tests.Architecture;
 /// The one remaining slice boundary this suite needs to enforce with a test: a feature is
 /// self-contained. "Shared/ and the DependencyInjection plumbing never depend on a feature"
 /// used to be two more rules here, checked the same way — but since both moved to
-/// <c>AspNetDesignPatterns.Api.Shared</c> (a separate project with no reference back to this
-/// one), that dependency is now a compile error, not just a test failure. A rule this suite
+/// <c>KAM.Common</c> (a separate project with no reference back to this one), that dependency
+/// is now a compile error, not just a test failure. A rule this suite
 /// can't even express anymore is a stronger guarantee than one it enforces at runtime, so it
 /// was deleted rather than left in place checking nothing (see the Architecture/ README).
 /// </summary>

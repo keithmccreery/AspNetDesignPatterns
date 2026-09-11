@@ -21,7 +21,7 @@
     <PackageVersion Include="Serilog.Settings.Configuration" Version="10.0.1" />
     <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
-    <!-- Serilog core: referenced directly by AspNetDesignPatterns.Api.Shared (the log-injection
+    <!-- Serilog core: referenced directly by KAM.Common (the log-injection
          enricher implements ILogEventEnricher), not just pulled in transitively via Serilog.AspNetCore. -->
     <PackageVersion Include="Serilog" Version="4.3.0" />
   </ItemGroup>
@@ -46,7 +46,7 @@
     <PackageVersion Include="AwesomeAssertions" Version="9.6.0" />
     <PackageVersion Include="NSubstitute" Version="6.2.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
-    <!-- AspNetDesignPatterns.Api.Shared.Tests spins up a raw TestServer directly (not through
+    <!-- KAM.Common.Tests spins up a raw TestServer directly (not through
          WebApplicationFactory<Program>, which lives in the Api project) for tests that boot a
          minimal pipeline per environment. -->
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="10.0.12" />

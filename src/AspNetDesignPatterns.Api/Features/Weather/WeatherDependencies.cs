@@ -1,5 +1,5 @@
-using AspNetDesignPatterns.Api.DependencyInjection;
-using AspNetDesignPatterns.Api.Shared.HealthChecks;
+using KAM.Common.DependencyInjection;
+using KAM.Common.HealthChecks;
 
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;

@@ -12,8 +12,8 @@ namespace AspNetDesignPatterns.Api.Tests.Architecture;
 /// <remarks>
 /// <see cref="ProductionAssembly"/> is only <c>AspNetDesignPatterns.Api</c> — Features/,
 /// Program.cs, and (still) everything a rule here checks. It does <em>not</em> include
-/// <c>AspNetDesignPatterns.Api.Shared</c> (DependencyInjection/ and Shared/, in the separate
-/// project): a rule that needs to see into that assembly too would need its own
+/// <c>KAM.Common</c> (DependencyInjection/, Auth/, Results/, etc., in the separate project):
+/// a rule that needs to see into that assembly too would need its own
 /// <c>Types.InAssembly</c> query, which none of the current rules do.
 /// </remarks>
 internal static class ArchitectureRules

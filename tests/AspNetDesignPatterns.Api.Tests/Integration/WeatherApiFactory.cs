@@ -3,8 +3,9 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 
 using AspNetDesignPatterns.Api.Features.Weather;
-using AspNetDesignPatterns.Api.Shared.Auth;
 using AspNetDesignPatterns.Api.Tests.TestSupport;
+
+using KAM.Common.Auth;
 
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;

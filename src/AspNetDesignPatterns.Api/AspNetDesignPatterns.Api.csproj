@@ -27,9 +27,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- DependencyInjection/ and Shared/ live here: see AspNetDesignPatterns.Api.Shared/README.md
-         for why they're a separate project (a future reusable-package boundary). -->
-    <ProjectReference Include="..\AspNetDesignPatterns.Api.Shared\AspNetDesignPatterns.Api.Shared.csproj" />
+    <!-- DependencyInjection/, Auth/, Results/, etc. live here: see src/KAM.Common/README.md
+         for why they're a separate, independently reusable project. -->
+    <ProjectReference Include="..\KAM.Common\KAM.Common.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,8 +1,8 @@
-using AspNetDesignPatterns.Api.DependencyInjection;
-using AspNetDesignPatterns.Api.Shared.Handlers;
-using AspNetDesignPatterns.Api.Shared.Pipeline;
-
 using FluentValidation;
+
+using KAM.Common.DependencyInjection;
+using KAM.Common.Handlers;
+using KAM.Common.Pipeline;
 
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 

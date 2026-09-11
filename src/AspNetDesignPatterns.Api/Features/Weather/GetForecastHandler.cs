@@ -1,5 +1,5 @@
-using AspNetDesignPatterns.Api.Shared.Handlers;
-using AspNetDesignPatterns.Api.Shared.Pipeline;
+using KAM.Common.Handlers;
+using KAM.Common.Pipeline;
 
 namespace AspNetDesignPatterns.Api.Features.Weather;
 

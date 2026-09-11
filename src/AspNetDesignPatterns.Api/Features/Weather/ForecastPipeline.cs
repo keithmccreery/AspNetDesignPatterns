@@ -1,4 +1,4 @@
-using AspNetDesignPatterns.Api.Shared.Pipeline;
+using KAM.Common.Pipeline;
 
 using Microsoft.Extensions.Options;
 
