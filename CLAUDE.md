@@ -13,7 +13,7 @@ and consistency matter more than cleverness. It grows one vertical-slice feature
 
 ```bash
 dotnet build                                  # builds both src projects; compiler warnings are errors
-dotnet test                                   # NUnit, both test projects; ~180 tests (incl. NetArchTest arch rules)
+dotnet test                                   # NUnit, both test projects; ~205 tests (incl. NetArchTest arch rules)
 dotnet format --verify-no-changes             # style + whitespace gate (CI)
 dotnet format                                 # apply style fixes
 dotnet run --project src/AspNetDesignPatterns.Api   # needs src/.../.env (copy .env.example)
@@ -38,13 +38,22 @@ probes at `/health/live` + `/health/ready`.
 - **Vertical slices** under `Features/<Name>/` (in `AspNetDesignPatterns.Api`) — each owns its
   endpoint, request+validator, response DTO, handler, service, client, options, pipeline steps.
 - **Cross-cutting building blocks** (in `KAM.Common`) — one top-level folder per concern
-  (`Results/`, `Pipeline/`, `Auth/`, `HealthChecks/`, `OpenApi/`, `Logging/`,
-  `FluentValidations/`, `Configuration/`, `Handlers/`), each with a README. Infrastructure that
-  is genuinely cross-cutting (auth, OpenAPI, health checks) *is* wired in `Program.cs`; only
-  *feature* registration goes through the reflection scans / `IDependency`. A type a reflection
-  scan needs to see from `Program.cs` but that should stay `internal` gets its own registration
-  extension (e.g. `AddGlobalExceptionHandler()`) rather than being made `public` just to be
-  nameable across the project boundary.
+  (`Results/`, `Pipeline/`, `Auth/`, `Authorization/`, `Cors/`, `HealthChecks/`, `OpenApi/`,
+  `Logging/`, `FluentValidations/`, `Configuration/`, `Handlers/`), each with a README.
+  Infrastructure that is genuinely cross-cutting (auth, CORS, OpenAPI, health checks) *is*
+  wired in `Program.cs`; only *feature* registration goes through the reflection scans /
+  `IDependency`. A type a reflection scan needs to see from `Program.cs` but that should stay
+  `internal` gets its own registration extension (e.g. `AddGlobalExceptionHandler()`) rather
+  than being made `public` just to be nameable across the project boundary.
+- **`Auth/` vs `Authorization/`** — deliberately separate: `Auth/` is authentication (who the
+  caller is — JWT bearer validation, the dev-token endpoint); `Authorization/` is authorization
+  (what they can do), expressed as **config-driven policies** (`appsettings.json`, not
+  hardcoded C#) so adding or tightening a policy doesn't need a redeploy. Both are wired in
+  `Program.cs` (`AddJwtAuth()` then `AddPolicyDrivenAuthorization()`). See `Authorization/README.md`
+  for a real bug this surfaced: a policy *name* containing `:` doesn't survive
+  `IConfiguration` binding (`:` is its own path separator), so policy names and OAuth2 scope
+  values (which use `:` freely) must stay separate constants — same principle as `Auth/AuthorizationPolicies.cs`
+  already documented, now with a concrete failure mode behind it.
 - **`DependencyInjection/`** (in `KAM.Common`) — the reflection-registration conventions, one
   folder per concern (`Endpoints/`, `Settings/`, `Dependencies/`, `RequestHandlers/`,
   `ExceptionHandling/`) — see its README. **Every scan takes an explicit

@@ -11,7 +11,9 @@ using DotNetEnv;
 using FluentValidation;
 
 using KAM.Common.Auth;
+using KAM.Common.Authorization;
 using KAM.Common.Configuration;
+using KAM.Common.Cors;
 using KAM.Common.DependencyInjection;
 using KAM.Common.HealthChecks;
 using KAM.Common.Logging;
@@ -105,7 +107,12 @@ builder.Services
     })
     .AddOpenApi(options => options.AddBearerSecurityScheme());
 
+// CORS, then authentication ("who is the caller"), then authorization ("what can they do") —
+// AddPolicyDrivenAuthorization() builds every named policy (and the fallback) from the
+// "Authorization" config section; see its README for why that's separate from AddJwtAuth().
+builder.Services.AddCorsPolicy();
 builder.Services.AddJwtAuth();
+builder.Services.AddPolicyDrivenAuthorization();
 builder.Services.AddHttpContextAccessor();
 
 // Health-check services. Individual checks self-register from the slice that owns them
@@ -140,6 +147,7 @@ app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseSerilogRequestLogging();
 
+app.UseCors(CorsExtensions.PolicyName);
 app.UseAuthentication();
 app.UseAuthorization();
 

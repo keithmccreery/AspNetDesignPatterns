@@ -2,14 +2,17 @@ namespace KAM.Common.Auth;
 
 /// <summary>
 /// Named authorization policies. Endpoints reference these by constant, never by string
-/// literal. A policy name is an internal identifier — it happens to read the same as the
-/// scope it checks, but the two are deliberately separate constants (see <see cref="Scopes"/>)
-/// so renaming one doesn't silently change the other.
+/// literal. A policy name is an internal identifier, deliberately separate from the scope
+/// value it checks (see <see cref="Scopes"/>) — so renaming one doesn't silently change the
+/// other, and so the name is free to avoid characters (like <c>:</c>) that mean something
+/// different to configuration binding than they do in a scope string. This one is
+/// config-driven — see <c>Authorization:Policies:WeatherRead</c> in <c>appsettings.json</c>
+/// and <see cref="KAM.Common.Authorization.AuthorizationExtensions"/>.
 /// </summary>
 public static class AuthorizationPolicies
 {
-    /// <summary>Read access to weather data. Requires the <see cref="Scopes.WeatherRead"/> scope.</summary>
-    public const string WeatherRead = "weather:read";
+    /// <summary>Read access to weather data. Configured to require the <see cref="Scopes.WeatherRead"/> scope.</summary>
+    public const string WeatherRead = "WeatherRead";
 }
 
 /// <summary>

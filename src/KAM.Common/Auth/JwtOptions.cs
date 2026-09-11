@@ -29,4 +29,26 @@ public sealed class JwtOptions : SettingsBase<JwtOptions>
 
     [Range(1, 1440)]
     public int AccessTokenMinutes { get; init; } = 60;
+
+    /// <summary>Whether to validate the token's <c>iss</c> claim against <see cref="Issuer"/>.</summary>
+    public bool ValidateIssuer { get; init; } = true;
+
+    /// <summary>Whether to validate the token's <c>aud</c> claim against <see cref="Audience"/>.</summary>
+    public bool ValidateAudience { get; init; } = true;
+
+    /// <summary>Whether to validate the token's <c>exp</c>/<c>nbf</c> claims.</summary>
+    public bool ValidateLifetime { get; init; } = true;
+
+    /// <summary>Clock skew tolerance, in seconds, applied when validating lifetime claims.</summary>
+    [Range(0, 3600)]
+    public int ClockSkewSeconds { get; init; } = 30;
+
+    /// <summary>Whether to save the raw token in <c>HttpContext.Items</c> via <c>AuthenticationProperties</c>.</summary>
+    public bool SaveToken { get; init; }
+
+    /// <summary>Overrides the claim type mapped to <c>ClaimsIdentity.Name</c>; defaults to <see cref="System.Security.Claims.ClaimTypes.Name"/> when unset.</summary>
+    public string? NameClaimType { get; init; }
+
+    /// <summary>Overrides the claim type checked by <c>RequireRole(...)</c>; defaults to <see cref="System.Security.Claims.ClaimTypes.Role"/> when unset.</summary>
+    public string? RoleClaimType { get; init; }
 }

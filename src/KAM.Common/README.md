@@ -10,7 +10,9 @@ knows a feature exists. Every folder here is a top-level namespace under `KAM.Co
 | [`Pipeline/`](Pipeline/README.md) | `KAM.Common.Pipeline` | Middleware-style sequential pipeline over a shared context. |
 | [`FluentValidations/`](FluentValidations/README.md) | `KAM.Common.FluentValidations` | Request validation at the HTTP edge and inside services. |
 | [`Logging/`](Logging/README.md) | `KAM.Common.Logging` | CWE-117 log-injection hardening for Serilog. |
-| [`Auth/`](Auth/README.md) | `KAM.Common.Auth` | JWT bearer auth, authorization policies, dev-token endpoint. |
+| [`Auth/`](Auth/README.md) | `KAM.Common.Auth` | JWT bearer authentication, dev-token endpoint. |
+| [`Authorization/`](Authorization/README.md) | `KAM.Common.Authorization` | Data-driven authorization policies (scopes/roles/claims/custom requirements from config) + the deny-by-default fallback. |
+| [`Cors/`](Cors/README.md) | `KAM.Common.Cors` | Cross-Origin Resource Sharing, configured from `appsettings.json`. |
 | [`HealthChecks/`](HealthChecks/README.md) | `KAM.Common.HealthChecks` | Liveness + readiness probes, tag-split, custom JSON writer. |
 | [`Configuration/`](Configuration/README.md) | `KAM.Common.Configuration` | "Where/how am I running" view of the environment. |
 | [`OpenApi/`](OpenApi/README.md) | `KAM.Common.OpenApi` | OpenAPI document + Scalar UI + JWT security scheme. |

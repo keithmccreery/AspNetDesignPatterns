@@ -1,18 +1,10 @@
 using System.ComponentModel.DataAnnotations;
-using System.Net;
-using System.Security.Claims;
 
 using KAM.Common.Auth;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Authorization.Infrastructure;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace KAM.Common.Tests.Auth;
@@ -20,12 +12,12 @@ namespace KAM.Common.Tests.Auth;
 [TestFixture]
 public class AuthExtensionsTests
 {
-    private static ServiceProvider BuildProvider()
+    private static ServiceProvider BuildProvider(JwtOptions? jwtOptions = null)
     {
         ServiceCollection services = new();
         services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddLogging();
-        services.AddSingleton(Microsoft.Extensions.Options.Options.Create(new JwtOptions
+        services.AddSingleton(Microsoft.Extensions.Options.Options.Create(jwtOptions ?? new JwtOptions
         {
             SigningKey = "auth-wiring-tests-signing-key-0123456789",
             Issuer = "iss",
@@ -50,48 +42,6 @@ public class AuthExtensionsTests
     }
 
     [Test]
-    public async Task Registers_the_weather_read_policy_denying_anonymous_users()
-    {
-        // Arrange
-        using ServiceProvider provider = BuildProvider();
-        IAuthorizationPolicyProvider policyProvider = provider.GetRequiredService<IAuthorizationPolicyProvider>();
-
-        // Act
-        AuthorizationPolicy? policy = await policyProvider.GetPolicyAsync(AuthorizationPolicies.WeatherRead);
-
-        // Assert
-        policy!.Requirements.Should().Contain(r => r is DenyAnonymousAuthorizationRequirement);
-    }
-
-    [Test]
-    public async Task Registers_the_weather_read_policy_accepting_either_scope_claim_shape()
-    {
-        // Arrange — a RequireClaim("scope", "weather:read") policy (what this used to be) only
-        // matches a claim whose value is exactly "weather:read"; a real IdP sends one
-        // space-delimited scope claim, which that check rejects. This proves the fix.
-        using ServiceProvider provider = BuildProvider();
-        IAuthorizationPolicyProvider policyProvider = provider.GetRequiredService<IAuthorizationPolicyProvider>();
-        AuthorizationPolicy? policy = await policyProvider.GetPolicyAsync(AuthorizationPolicies.WeatherRead);
-        AssertionRequirement assertion = policy!.Requirements.OfType<AssertionRequirement>().Single();
-
-        // Act & Assert
-        using (new AssertionScope())
-        {
-            (await Satisfies(assertion, "weather:read")).Should().BeTrue("an exact single scope claim must match");
-            (await Satisfies(assertion, "weather:read openid profile")).Should().BeTrue(
-                "a standard space-delimited scope claim (what a real IdP sends) must match");
-            (await Satisfies(assertion, "openid profile")).Should().BeFalse("the required scope is absent");
-        }
-    }
-
-    private static Task<bool> Satisfies(AssertionRequirement assertion, string scopeClaimValue)
-    {
-        ClaimsPrincipal user = new(new ClaimsIdentity([new Claim("scope", scopeClaimValue)], "test"));
-        AuthorizationHandlerContext context = new([assertion], user, resource: null);
-        return assertion.Handler(context);
-    }
-
-    [Test]
     public void Configures_bearer_token_validation_from_JwtOptions()
     {
         // Arrange
@@ -106,45 +56,83 @@ public class AuthExtensionsTests
         {
             bearer.TokenValidationParameters.ValidIssuer.Should().Be("iss");
             bearer.TokenValidationParameters.ValidAudience.Should().Be("aud");
+            bearer.TokenValidationParameters.ValidateIssuer.Should().BeTrue();
+            bearer.TokenValidationParameters.ValidateAudience.Should().BeTrue();
             bearer.TokenValidationParameters.ValidateLifetime.Should().BeTrue();
+            bearer.TokenValidationParameters.ClockSkew.Should().Be(TimeSpan.FromSeconds(30));
+            bearer.SaveToken.Should().BeFalse();
         }
     }
 
     [Test]
-    public async Task An_endpoint_that_declares_no_auth_intent_requires_authentication_by_default()
+    public void Honors_the_configurable_validation_toggles_and_clock_skew()
     {
-        // Arrange — a full pipeline, not just DI registration: the fallback policy is a
-        // middleware-level effect. One endpoint deliberately calls neither
-        // .RequireAuthorization(...) nor .AllowAnonymous(), the mistake EndpointAuthorizationTests
-        // (Integration/) catches at the type level; this proves the runtime backstop for it.
-        using IHost host = await new HostBuilder()
-            .ConfigureWebHost(web => web
-                .UseTestServer()
-                .ConfigureServices(services =>
-                {
-                    services.AddRouting();
-                    services.AddLogging();
-                    services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
-                    services.AddSingleton(Microsoft.Extensions.Options.Options.Create(new JwtOptions
-                    {
-                        SigningKey = "fallback-policy-test-signing-key-0123456789",
-                        Issuer = "iss",
-                        Audience = "aud",
-                    }));
-                    services.AddJwtAuth();
-                })
-                .Configure(app => app
-                    .UseRouting()
-                    .UseAuthentication()
-                    .UseAuthorization()
-                    .UseEndpoints(endpoints => endpoints.MapGet("/undeclared", () => "should not be reachable anonymously"))))
-            .StartAsync();
-
-        // Act
-        HttpResponseMessage response = await host.GetTestClient().GetAsync("/undeclared");
+        // Arrange & Act
+        using ServiceProvider provider = BuildProvider(new JwtOptions
+        {
+            SigningKey = "auth-wiring-tests-signing-key-0123456789",
+            Issuer = "iss",
+            Audience = "aud",
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateLifetime = false,
+            ClockSkewSeconds = 120,
+            SaveToken = true,
+        });
+        JwtBearerOptions bearer = provider.GetRequiredService<IOptionsMonitor<JwtBearerOptions>>()
+            .Get(JwtBearerDefaults.AuthenticationScheme);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        using (new AssertionScope())
+        {
+            bearer.TokenValidationParameters.ValidateIssuer.Should().BeFalse();
+            bearer.TokenValidationParameters.ValidateAudience.Should().BeFalse();
+            bearer.TokenValidationParameters.ValidateLifetime.Should().BeFalse();
+            bearer.TokenValidationParameters.ClockSkew.Should().Be(TimeSpan.FromSeconds(120));
+            bearer.SaveToken.Should().BeTrue();
+        }
+    }
+
+    [Test]
+    public void Overrides_the_name_and_role_claim_types_when_configured()
+    {
+        // Arrange & Act
+        using ServiceProvider provider = BuildProvider(new JwtOptions
+        {
+            SigningKey = "auth-wiring-tests-signing-key-0123456789",
+            Issuer = "iss",
+            Audience = "aud",
+            NameClaimType = "custom_name",
+            RoleClaimType = "custom_role",
+        });
+        JwtBearerOptions bearer = provider.GetRequiredService<IOptionsMonitor<JwtBearerOptions>>()
+            .Get(JwtBearerDefaults.AuthenticationScheme);
+
+        // Assert
+        using (new AssertionScope())
+        {
+            bearer.TokenValidationParameters.NameClaimType.Should().Be("custom_name");
+            bearer.TokenValidationParameters.RoleClaimType.Should().Be("custom_role");
+        }
+    }
+
+    [Test]
+    public void Registers_JwtBearerEvents_for_authentication_observability()
+    {
+        // Arrange & Act
+        using ServiceProvider provider = BuildProvider();
+        JwtBearerOptions bearer = provider.GetRequiredService<IOptionsMonitor<JwtBearerOptions>>()
+            .Get(JwtBearerDefaults.AuthenticationScheme);
+
+        // Assert — the events exist and don't throw when invoked; the exact log content isn't
+        // asserted here, since that's Serilog's concern once wired, not this DI-registration test's.
+        using (new AssertionScope())
+        {
+            bearer.Events.Should().NotBeNull();
+            bearer.Events!.OnAuthenticationFailed.Should().NotBeNull();
+            bearer.Events.OnTokenValidated.Should().NotBeNull();
+            bearer.Events.OnChallenge.Should().NotBeNull();
+        }
     }
 }
 
@@ -191,5 +179,19 @@ public class JwtOptionsTests
             Audience = "a",
             AccessTokenMinutes = minutes,
         }).Should().Contain(r => r.MemberNames.Contains(nameof(JwtOptions.AccessTokenMinutes)));
+    }
+
+    [TestCase(-1)]
+    [TestCase(3601)]
+    public void An_out_of_range_clock_skew_is_rejected(int seconds)
+    {
+        // Arrange & Act & Assert
+        Validate(new JwtOptions
+        {
+            SigningKey = new string('k', 32),
+            Issuer = "i",
+            Audience = "a",
+            ClockSkewSeconds = seconds,
+        }).Should().Contain(r => r.MemberNames.Contains(nameof(JwtOptions.ClockSkewSeconds)));
     }
 }
