@@ -37,7 +37,7 @@ internal static class ArchitectureRules
     ];
 
     /// <summary>Asserts a rule holds, naming every offending type when it does not.</summary>
-    public static void Assert(TestResult result, string because)
+    public static void AssertRuleHolds(TestResult result, string because)
     {
         result.IsSuccessful.Should().BeTrue(
             "{0}, but these types break the rule: {1}",

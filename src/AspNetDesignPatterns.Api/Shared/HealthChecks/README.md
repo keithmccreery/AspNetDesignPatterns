@@ -14,7 +14,7 @@ Both are **anonymous**, both are **hidden from the OpenAPI document**, both sit 
 
 | File | Type | Purpose |
 |---|---|---|
-| `HealthCheckTag.cs` | `static class` | The `Ready` / `Live` tag constants the endpoints filter on. |
+| `HealthCheckTag.cs` | `static class` | `HealthCheckTag.Ready` — the tag `/health/ready` filters on. No `Live` equivalent: liveness runs zero checks, so nothing would ever read it. |
 | `HealthCheckResponseWriter.cs` | `static` writer | Serializes a `HealthReport` to `{ status, totalDurationMs, entries: { name: { status, durationMs, description, error, tags } } }` using the app's shared `JsonSerializerOptions`. `description`/`error` (exception **message**, never a stack trace) are included only outside Production — both routes are anonymous, so a hand-written check `Description` or an `Exception.Message` (hostname, port, connection-string fragment) must not reach an unauthenticated caller in Production. |
 | `HealthCheckExtensions.cs` | `MapAppHealthChecks()` | Maps the two routes with the tag predicates and the response writer. |
 

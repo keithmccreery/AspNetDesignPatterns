@@ -139,6 +139,7 @@ dotnet_diagnostic.MA0079.severity = warning         # flow a CancellationToken u
 dotnet_diagnostic.MA0002.severity = warning         # pass an explicit StringComparer to Dictionary / GroupBy / ToDictionary
 dotnet_diagnostic.MA0076.severity = warning         # no implicit culture-sensitive ToString in interpolated strings
 dotnet_diagnostic.VSTHRD200.severity = warning      # 'Async' suffix on methods that return an awaitable (exempted for test methods below)
+dotnet_diagnostic.SA1517.severity = warning         # no blank line at the start of a file
 
 # --- IDE0058 "expression value is never used": off. Fires ~260x, almost entirely on
 #     AwesomeAssertions fluent chains (`x.Should()...` returns a discarded AndConstraint)

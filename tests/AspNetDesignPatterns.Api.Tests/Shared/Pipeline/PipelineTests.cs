@@ -1,3 +1,5 @@
+using System.Reflection;
+
 using AspNetDesignPatterns.Api.Shared.Pipeline;
 using AspNetDesignPatterns.Api.Shared.Results;
 
@@ -48,7 +50,7 @@ public class PipelineTests
         Pipeline<Ctx> pipeline = new(services.BuildServiceProvider());
         foreach (Type step in steps)
         {
-            typeof(Pipeline<Ctx>).GetMethod(nameof(Pipeline<Ctx>.Use))!
+            typeof(Pipeline<Ctx>).GetMethod(nameof(Pipeline<Ctx>.Use), BindingFlags.NonPublic | BindingFlags.Instance)!
                 .MakeGenericMethod(step)
                 .Invoke(pipeline, null);
         }

@@ -1,4 +1,3 @@
-
 namespace AspNetDesignPatterns.Api.Shared.Pipeline;
 
 /// <summary>
@@ -14,8 +13,13 @@ public sealed class Pipeline<TContext>(IServiceProvider serviceProvider)
 
     private readonly List<Type> _stepTypes = [];
 
-    /// <summary>Appends a step type to the chain. Resolved from DI when the pipeline runs.</summary>
-    public Pipeline<TContext> Use<TStep>()
+    /// <summary>
+    /// Appends a step type to the chain. Resolved from DI when the pipeline runs. Internal:
+    /// composing a pipeline goes through <see cref="IPipelineBuilder{TContext}"/> so that once
+    /// <see cref="IPipelineBuilder{TContext}.Build"/> has handed out this instance, its chain
+    /// is fixed — a caller holding the built <see cref="Pipeline{TContext}"/> cannot mutate it.
+    /// </summary>
+    internal Pipeline<TContext> Use<TStep>()
         where TStep : class, IPipelineStep<TContext>
     {
         _stepTypes.Add(typeof(TStep));

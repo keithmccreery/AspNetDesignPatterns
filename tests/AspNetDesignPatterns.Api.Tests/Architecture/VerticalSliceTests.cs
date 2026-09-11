@@ -29,7 +29,7 @@ public class VerticalSliceTests
             .GetResult();
 
         // Assert
-        ArchitectureRules.Assert(result, $"{feature} must not reach into another feature slice");
+        ArchitectureRules.AssertRuleHolds(result, $"{feature} must not reach into another feature slice");
     }
 
     [Test]
@@ -42,7 +42,7 @@ public class VerticalSliceTests
             .GetResult();
 
         // Assert
-        ArchitectureRules.Assert(result, "Shared/ is a building block — it cannot know about a feature");
+        ArchitectureRules.AssertRuleHolds(result, "Shared/ is a building block — it cannot know about a feature");
     }
 
     [Test]
@@ -55,6 +55,6 @@ public class VerticalSliceTests
             .GetResult();
 
         // Assert
-        ArchitectureRules.Assert(result, "the reflection-registration plumbing is generic — it cannot know about a feature");
+        ArchitectureRules.AssertRuleHolds(result, "the reflection-registration plumbing is generic — it cannot know about a feature");
     }
 }

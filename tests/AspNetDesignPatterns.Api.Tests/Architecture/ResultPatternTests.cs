@@ -23,7 +23,7 @@ public class ResultPatternTests
             .GetResult();
 
         // Assert
-        ArchitectureRules.Assert(result, "a service must not hand a bare value or a raw task upward");
+        ArchitectureRules.AssertRuleHolds(result, "a service must not hand a bare value or a raw task upward");
     }
 
     [Test]
@@ -36,7 +36,7 @@ public class ResultPatternTests
             .GetResult();
 
         // Assert
-        ArchitectureRules.Assert(result, "a handler is the edge of the Result world");
+        ArchitectureRules.AssertRuleHolds(result, "a handler is the edge of the Result world");
     }
 
     [Test]
@@ -50,7 +50,7 @@ public class ResultPatternTests
             .GetResult();
 
         // Assert
-        ArchitectureRules.Assert(result, "above the client, a failure is a returned Error — not an exception");
+        ArchitectureRules.AssertRuleHolds(result, "above the client, a failure is a returned Error — not an exception");
     }
 
     [Test]
@@ -64,7 +64,7 @@ public class ResultPatternTests
             .GetResult();
 
         // Assert
-        ArchitectureRules.Assert(result, "transport failures become exceptions in the client and nowhere else");
+        ArchitectureRules.AssertRuleHolds(result, "transport failures become exceptions in the client and nowhere else");
     }
 
     [Test]

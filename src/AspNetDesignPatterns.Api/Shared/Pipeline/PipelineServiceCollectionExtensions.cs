@@ -2,6 +2,8 @@ using System.Reflection;
 
 using AspNetDesignPatterns.Api.Shared.Pipeline;
 
+using Microsoft.Extensions.DependencyInjection.Extensions;
+
 #pragma warning disable IDE0130 // Namespace does not match folder structure (intentional: discoverable on IServiceCollection)
 namespace Microsoft.Extensions.DependencyInjection;
 #pragma warning restore IDE0130
@@ -29,15 +31,18 @@ public static class PipelineServiceCollectionExtensions
             assemblies = [Assembly.GetCallingAssembly()];
         }
 
-        IEnumerable<Type> stepTypes = assemblies
-            .SelectMany(a => a.GetTypes())
-            .Where(t => t is { IsClass: true, IsAbstract: false }
-                        && t.GetInterfaces().Any(i => i.IsGenericType
-                            && i.GetGenericTypeDefinition() == typeof(IPipelineStep<>)));
+        // Mirrors DependencyInjectionExtensions.ConcreteTypes: DefinedTypes over GetTypes(),
+        // which throws ReflectionTypeLoadException if any single type in the assembly fails
+        // to load, and TryAddScoped so a repeated scan (or a step registered by hand) doesn't
+        // double-register.
+        IEnumerable<TypeInfo> stepTypes = assemblies
+            .SelectMany(assembly => assembly.DefinedTypes)
+            .Where(type => type is { IsAbstract: false, IsInterface: false, IsGenericTypeDefinition: false }
+                        && type.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IPipelineStep<>)));
 
-        foreach (Type stepType in stepTypes)
+        foreach (TypeInfo stepType in stepTypes)
         {
-            services.AddScoped(stepType);
+            services.TryAddScoped(stepType);
         }
 
         return services;

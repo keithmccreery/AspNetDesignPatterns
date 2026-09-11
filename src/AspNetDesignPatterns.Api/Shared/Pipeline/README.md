@@ -9,10 +9,10 @@ chain, short-circuit by not calling `next`, or fail by returning `Result.Failure
 | File | Type | Purpose |
 |---|---|---|
 | `IPipelineStep.cs` | `IPipelineStep<TContext>` | One step: `Task<Result> ExecuteAsync(TContext, Func<CancellationToken, Task<Result>> next, CancellationToken)`. |
-| `Pipeline.cs` | `Pipeline<TContext>` | Holds an ordered list of step **types**, resolves each from DI at execution time, and runs the chain. Stops at the first failure or the first step that doesn't call `next`. Checks the `CancellationToken` before each step. |
+| `Pipeline.cs` | `Pipeline<TContext>` | Holds an ordered list of step **types**, resolves each from DI at execution time, and runs the chain. Stops at the first failure or the first step that doesn't call `next`. Checks the `CancellationToken` before each step. `Use<TStep>()` is `internal` — composing happens through `IPipelineBuilder<TContext>`, so a caller holding the built pipeline can't mutate its chain. |
 | `IPipelineBuilder.cs` / `PipelineBuilder.cs` | fluent builder | `.Use<TStep>()` … `.Build()`. |
 | `IPipelineFactory.cs` / `PipelineFactory.cs` | `IPipelineFactory` | `factory.CreateBuilder<TContext>()`. Inject this into a handler. |
-| `PipelineServiceCollectionExtensions.cs` | registration | `AddPipeline()` registers the factory (scoped); `AddPipelineSteps(assemblies…)` reflection-registers every concrete `IPipelineStep<>` (scoped). Both are called once in `Program.cs`. |
+| `PipelineServiceCollectionExtensions.cs` | registration | `AddPipeline()` registers the factory (scoped); `AddPipelineSteps(assemblies…)` reflection-registers every concrete `IPipelineStep<>` (scoped, `TryAddScoped` so a repeat scan doesn't double-register). Both are called once in `Program.cs`. |
 
 ## Usage
 

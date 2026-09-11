@@ -29,7 +29,7 @@ public class ConventionTests
             .GetResult();
 
         // Assert
-        ArchitectureRules.Assert(result, "an endpoint is an internal, sealed IEndpoint named …Endpoint");
+        ArchitectureRules.AssertRuleHolds(result, "an endpoint is an internal, sealed IEndpoint named …Endpoint");
     }
 
     [Test]
@@ -43,7 +43,7 @@ public class ConventionTests
             .GetResult();
 
         // Assert
-        ArchitectureRules.Assert(result, "a handler implements IRequestHandler<,> and is named …Handler");
+        ArchitectureRules.AssertRuleHolds(result, "a handler implements IRequestHandler<,> and is named …Handler");
     }
 
     [Test]
@@ -56,7 +56,7 @@ public class ConventionTests
             .GetResult();
 
         // Assert
-        ArchitectureRules.Assert(result, "a pipeline step implements IPipelineStep<> and is named …Step");
+        ArchitectureRules.AssertRuleHolds(result, "a pipeline step implements IPipelineStep<> and is named …Step");
     }
 
     [Test]
@@ -69,7 +69,7 @@ public class ConventionTests
             .GetResult();
 
         // Assert
-        ArchitectureRules.Assert(result, "a settings class inherits SettingsBase<T> and is named …Options");
+        ArchitectureRules.AssertRuleHolds(result, "a settings class inherits SettingsBase<T> and is named …Options");
     }
 
     [Test]
@@ -82,7 +82,7 @@ public class ConventionTests
             .GetResult();
 
         // Assert
-        ArchitectureRules.Assert(result, "a FluentValidation validator is named …Validator");
+        ArchitectureRules.AssertRuleHolds(result, "a FluentValidation validator is named …Validator");
     }
 
     [Test]
@@ -95,7 +95,7 @@ public class ConventionTests
             .GetResult();
 
         // Assert
-        ArchitectureRules.Assert(result, "an IHealthCheck is named …HealthCheck");
+        ArchitectureRules.AssertRuleHolds(result, "an IHealthCheck is named …HealthCheck");
     }
 
     [Test]
@@ -108,7 +108,7 @@ public class ConventionTests
             .GetResult();
 
         // Assert
-        ArchitectureRules.Assert(result, "a DI module implements IDependency and is named …Dependencies");
+        ArchitectureRules.AssertRuleHolds(result, "a DI module implements IDependency and is named …Dependencies");
     }
 
     [Test]
@@ -121,6 +121,6 @@ public class ConventionTests
             .GetResult();
 
         // Assert
-        ArchitectureRules.Assert(result, "an endpoint binds + validates + delegates to IRequestHandler — nothing lower");
+        ArchitectureRules.AssertRuleHolds(result, "an endpoint binds + validates + delegates to IRequestHandler — nothing lower");
     }
 }

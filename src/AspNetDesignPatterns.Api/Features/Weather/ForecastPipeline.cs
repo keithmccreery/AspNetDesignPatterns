@@ -1,5 +1,3 @@
-using System.Globalization;
-
 using AspNetDesignPatterns.Api.Shared.Pipeline;
 
 using Microsoft.Extensions.Options;
@@ -29,9 +27,11 @@ internal sealed class ClampForecastWindowStep(IOptions<WeatherOptions> options)
         if (context.Request.Days > options.Value.MaxForecastDays)
         {
             // Do not call next: the rest of the pipeline is skipped.
+#pragma warning disable MA0076 // a plain int in an English sentence, not a machine-read value — unlike the query string in OpenMeteoWeatherClient, culture-invariance buys nothing here
             return Task.FromResult(Result.Failure(Error.Validation(
                 "Weather.ForecastWindowTooLarge",
-                $"At most {options.Value.MaxForecastDays.ToString(CultureInfo.InvariantCulture)} days can be requested.")));
+                $"At most {options.Value.MaxForecastDays} days can be requested.")));
+#pragma warning restore MA0076
         }
 
         return next(cancellationToken);

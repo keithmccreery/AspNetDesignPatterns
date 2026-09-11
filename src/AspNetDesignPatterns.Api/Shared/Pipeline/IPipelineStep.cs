@@ -1,4 +1,3 @@
-
 namespace AspNetDesignPatterns.Api.Shared.Pipeline;
 
 /// <summary>
