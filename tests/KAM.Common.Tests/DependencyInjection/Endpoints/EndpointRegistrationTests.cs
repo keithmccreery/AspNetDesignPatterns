@@ -49,4 +49,18 @@ public class EndpointRegistrationTests
                 .Should().Be(ServiceLifetime.Transient);
         }
     }
+
+    [Test]
+    public void AddEndpoints_with_no_assemblies_falls_back_to_the_calling_assembly()
+    {
+        // Arrange — see DependencyRegistrationTests's equivalent test for why this matters.
+        ServiceCollection services = new();
+
+        // Act
+        services.AddEndpoints();
+
+        // Assert
+        services.BuildServiceProvider().GetServices<IEndpoint>()
+            .Should().Contain(e => e is EndpointOne).And.Contain(e => e is EndpointTwo);
+    }
 }

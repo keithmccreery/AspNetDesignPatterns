@@ -89,6 +89,25 @@ public class PipelineFactoryTests
     }
 
     [Test]
+    public void AddPipelineSteps_with_no_assemblies_falls_back_to_the_calling_assembly()
+    {
+        // Arrange — see DependencyRegistrationTests's equivalent test for why this matters.
+        ServiceCollection services = new();
+        services.AddPipeline();
+
+        // Act
+        services.AddPipelineSteps();
+
+        // Assert
+        using ServiceProvider provider = services.BuildServiceProvider();
+        using (new AssertionScope())
+        {
+            provider.GetService<DoubleStep>().Should().NotBeNull();
+            provider.GetService<AddOneStep>().Should().NotBeNull();
+        }
+    }
+
+    [Test]
     public void Constructing_a_factory_without_a_provider_throws()
     {
         // Arrange

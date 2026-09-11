@@ -82,6 +82,51 @@ public class ResultTests
     }
 
     [Test]
+    public void Creating_a_failure_with_no_error_is_rejected()
+    {
+        // Arrange
+        // Result.Failure would refuse Error.None itself; drive the invariant through the ctor guard.
+        Func<Result> act = () => new TestableResult(isSuccess: false, Error.None);
+
+        // Act & Assert
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Test]
+    public void TryGetValue_returns_the_value_and_true_for_a_success()
+    {
+        // Arrange
+        Result<int> result = Result.Success(5);
+
+        // Act
+        bool found = result.TryGetValue(out int value);
+
+        // Assert
+        using (new AssertionScope())
+        {
+            found.Should().BeTrue();
+            value.Should().Be(5);
+        }
+    }
+
+    [Test]
+    public void TryGetValue_returns_false_and_no_value_for_a_failure()
+    {
+        // Arrange
+        Result<int> result = Result.Failure<int>(Error.NotFound("X", "y"));
+
+        // Act
+        bool found = result.TryGetValue(out int value);
+
+        // Assert
+        using (new AssertionScope())
+        {
+            found.Should().BeFalse();
+            value.Should().Be(default);
+        }
+    }
+
+    [Test]
     public void ToResult_drops_the_value_but_keeps_the_outcome()
     {
         // Arrange & Act & Assert

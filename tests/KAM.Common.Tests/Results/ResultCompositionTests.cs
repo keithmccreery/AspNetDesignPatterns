@@ -57,6 +57,44 @@ public class ResultCompositionTests
         // Assert
         log.Should().Equal("ok", "err");
     }
+
+    [Test]
+    public void Match_collapses_a_non_generic_result()
+    {
+        // Arrange & Act & Assert
+        Result.Success().Match(() => "ok", e => $"err {e.Code}").Should().Be("ok");
+        ((Result) Boom).Match(() => "ok", e => $"err {e.Code}").Should().Be("err X.Boom");
+    }
+
+    [Test]
+    public void Bind_overloads_for_a_non_generic_Result_chain_or_short_circuit()
+    {
+        // Arrange & Act & Assert — Result<TIn> -> Result
+        Result.Success(2).Bind(x => x > 0 ? Result.Success() : Boom).IsSuccess.Should().BeTrue();
+        Result.Failure<int>(Boom).Bind(_ => Result.Success()).Error.Should().Be(Boom);
+
+        // Result -> Result
+        Result.Success().Bind(() => Result.Success()).IsSuccess.Should().BeTrue();
+        ((Result) Boom).Bind(() => throw new InvalidOperationException("should not run")).Error.Should().Be(Boom);
+
+        // Result -> Result<TOut>
+        Result.Success().Bind(() => Result.Success(1)).Value.Should().Be(1);
+        ((Result) Boom).Bind(() => Result.Success(1)).Error.Should().Be(Boom);
+    }
+
+    [Test]
+    public void Tap_and_TapError_run_the_matching_side_effect_only_for_a_non_generic_Result()
+    {
+        // Arrange
+        List<string> log = [];
+
+        // Act
+        Result.Success().Tap(() => log.Add("ok")).TapError(_ => log.Add("err"));
+        ((Result) Boom).Tap(() => log.Add("ok")).TapError(_ => log.Add("err"));
+
+        // Assert
+        log.Should().Equal("ok", "err");
+    }
 }
 
 [TestFixture]
@@ -149,6 +187,32 @@ public class ResultUtilitiesTests
     }
 
     [Test]
+    public void Combine_of_non_generic_results_succeeds_when_all_succeed()
+    {
+        // Arrange & Act
+        Result combined = ResultUtilities.Combine(Result.Success(), Result.Success(), Result.Success());
+
+        // Assert
+        combined.IsSuccess.Should().BeTrue();
+    }
+
+    [Test]
+    public void Combine_of_values_returns_the_first_failure()
+    {
+        // Arrange
+        Error first = Error.NotFound("A", "a");
+
+        // Act
+        Result<IReadOnlyList<int>> combined = ResultUtilities.Combine(
+            Result.Success(1),
+            Result.Failure<int>(first),
+            Result.Failure<int>(Error.Conflict("B", "b")));
+
+        // Assert
+        combined.Error.Should().Be(first);
+    }
+
+    [Test]
     public void CombineAll_aggregates_every_failure_as_a_validation_error()
     {
         // Arrange & Act
@@ -183,5 +247,73 @@ public class ResultUtilitiesTests
 
         // Assert
         hit.Value.Should().Be("found 2");
+    }
+
+    [Test]
+    public void FirstSuccess_returns_the_last_failure_when_nothing_succeeds()
+    {
+        // Arrange
+        Error last = Error.NotFound("N", "last");
+
+        // Act
+        Result<string> result = ResultUtilities.FirstSuccess(
+            [1, 2],
+            n => n == 1 ? Error.NotFound("N", "first") : Result.Failure<string>(last));
+
+        // Assert
+        result.Error.Should().Be(last);
+    }
+
+    [Test]
+    public void FirstSuccess_returns_a_NoItems_error_for_an_empty_sequence()
+    {
+        // Arrange & Act
+        Result<string> result = ResultUtilities.FirstSuccess(
+            [],
+            (int n) => Result.Success($"found {n}"));
+
+        // Assert
+        result.Error.Code.Should().Be("Result.NoItems");
+    }
+
+    [Test]
+    public void Ensure_with_a_single_predicate_wraps_or_fails()
+    {
+        // Arrange
+        Error error = Error.Validation("X", "must be positive");
+
+        // Act & Assert
+        ResultUtilities.Ensure(5, x => x > 0, error).Value.Should().Be(5);
+        ResultUtilities.Ensure(-1, x => x > 0, error).Error.Should().Be(error);
+    }
+
+    [Test]
+    public void Ensure_with_multiple_guards_succeeds_when_all_pass()
+    {
+        // Arrange & Act
+        Result<int> result = ResultUtilities.Ensure(
+            5,
+            (x => x > 0, Error.Validation("X", "must be positive")),
+            (x => x < 10, Error.Validation("X", "must be under 10")));
+
+        // Assert
+        result.Value.Should().Be(5);
+    }
+
+    [Test]
+    public void Ensure_with_multiple_guards_returns_the_first_failing_guard()
+    {
+        // Arrange
+        Error tooSmall = Error.Validation("X", "must be positive");
+        Error tooBig = Error.Validation("X", "must be under 10");
+
+        // Act
+        Result<int> result = ResultUtilities.Ensure(
+            15,
+            (x => x > 0, tooSmall),
+            (x => x < 10, tooBig));
+
+        // Assert — the first guard passes (15 > 0); the second is the one that actually fails.
+        result.Error.Should().Be(tooBig);
     }
 }

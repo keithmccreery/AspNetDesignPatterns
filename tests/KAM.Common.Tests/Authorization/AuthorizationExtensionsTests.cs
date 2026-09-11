@@ -206,4 +206,27 @@ public class AuthorizationExtensionsTests
         // Assert
         provider.GetServices<IAuthorizationHandler>().Should().Contain(h => h is ValidClientIdHandler);
     }
+
+    [Test]
+    public void A_malformed_policy_entry_is_logged_and_rethrown()
+    {
+        // Arrange — simulates a bad config binding (e.g. an explicit JSON null overriding the
+        // property's [] default); proves the catch-log-rethrow wrapper in ConfigureNamedPolicies
+        // actually runs rather than silently swallowing or masking the real exception.
+        AuthorizationSettings settings = new()
+        {
+            Policies = new Dictionary<string, PolicySettings>
+            {
+                ["Broken"] = new() { RequiredRoles = null! },
+            },
+        };
+        using ServiceProvider provider = BuildProvider(settings);
+
+        // Act — DefaultAuthorizationPolicyProvider resolves AuthorizationOptions eagerly in its
+        // constructor, so the lazy Configure<>() callback (and this failure) fires right here.
+        Action act = () => provider.GetRequiredService<IAuthorizationPolicyProvider>();
+
+        // Assert
+        act.Should().Throw<NullReferenceException>();
+    }
 }

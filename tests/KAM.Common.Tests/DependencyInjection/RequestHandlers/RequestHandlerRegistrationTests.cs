@@ -36,4 +36,17 @@ public class RequestHandlerRegistrationTests
                 .Should().Be(ServiceLifetime.Scoped);
         }
     }
+
+    [Test]
+    public void AddRequestHandlers_with_no_assemblies_falls_back_to_the_calling_assembly()
+    {
+        // Arrange — see DependencyRegistrationTests's equivalent test for why this matters.
+        ServiceCollection services = new();
+
+        // Act
+        services.AddRequestHandlers();
+
+        // Assert
+        services.BuildServiceProvider().GetService<IRequestHandler<Ping, int>>().Should().BeOfType<PingHandler>();
+    }
 }

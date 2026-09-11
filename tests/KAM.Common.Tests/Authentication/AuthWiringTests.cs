@@ -1,7 +1,9 @@
 using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 
 using KAM.Common.Authentication;
 
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -133,6 +135,71 @@ public class AuthExtensionsTests
             bearer.Events.OnTokenValidated.Should().NotBeNull();
             bearer.Events.OnChallenge.Should().NotBeNull();
         }
+    }
+
+    private static JwtBearerOptions ResolveBearerOptions(ServiceProvider provider) =>
+        provider.GetRequiredService<IOptionsMonitor<JwtBearerOptions>>().Get(JwtBearerDefaults.AuthenticationScheme);
+
+    private static AuthenticationScheme FakeScheme() =>
+        new(JwtBearerDefaults.AuthenticationScheme, displayName: null, typeof(JwtBearerHandler));
+
+    [Test]
+    public async Task OnAuthenticationFailed_logs_and_completes_without_throwing()
+    {
+        // Arrange
+        using ServiceProvider provider = BuildProvider();
+        JwtBearerOptions bearer = ResolveBearerOptions(provider);
+        AuthenticationFailedContext context = new(new DefaultHttpContext(), FakeScheme(), bearer)
+        {
+            Exception = new InvalidOperationException("bad token"),
+        };
+
+        // Act
+        Func<Task> act = () => bearer.Events!.OnAuthenticationFailed(context);
+
+        // Assert
+        await act.Should().NotThrowAsync();
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task OnTokenValidated_completes_without_throwing_with_or_without_a_name_claim(bool withNameClaim)
+    {
+        // Arrange — covers both sides of `context.Principal?.Identity?.Name ?? "Unknown"`.
+        using ServiceProvider provider = BuildProvider();
+        JwtBearerOptions bearer = ResolveBearerOptions(provider);
+        ClaimsIdentity identity = withNameClaim
+            ? new ClaimsIdentity([new Claim(ClaimTypes.Name, "alice")], "test")
+            : new ClaimsIdentity();
+        TokenValidatedContext context = new(new DefaultHttpContext(), FakeScheme(), bearer)
+        {
+            Principal = new ClaimsPrincipal(identity),
+        };
+
+        // Act
+        Func<Task> act = () => bearer.Events!.OnTokenValidated(context);
+
+        // Assert
+        await act.Should().NotThrowAsync();
+    }
+
+    [TestCase("invalid_token")]
+    [TestCase(null)]
+    public async Task OnChallenge_completes_without_throwing_with_or_without_an_error(string? error)
+    {
+        // Arrange — covers both sides of `context.Error ?? "Unknown"`.
+        using ServiceProvider provider = BuildProvider();
+        JwtBearerOptions bearer = ResolveBearerOptions(provider);
+        JwtBearerChallengeContext context = new(new DefaultHttpContext(), FakeScheme(), bearer, new AuthenticationProperties())
+        {
+            Error = error,
+        };
+
+        // Act
+        Func<Task> act = () => bearer.Events!.OnChallenge(context);
+
+        // Assert
+        await act.Should().NotThrowAsync();
     }
 }
 

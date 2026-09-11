@@ -28,4 +28,20 @@ public class DependencyRegistrationTests
         // Assert
         services.BuildServiceProvider().GetService<Marker>().Should().NotBeNull();
     }
+
+    [Test]
+    public void AddDependencies_with_no_assemblies_falls_back_to_the_calling_assembly()
+    {
+        // Arrange — the zero-arg default (Assembly.GetCallingAssembly()) is what silently
+        // stopped finding types once a real app split across two assemblies (see
+        // Program.cs's appAssemblies comment); this proves the fallback itself still works
+        // for the single-assembly case it's meant for.
+        ServiceCollection services = new();
+
+        // Act
+        services.AddDependencies();
+
+        // Assert
+        services.BuildServiceProvider().GetService<Marker>().Should().NotBeNull();
+    }
 }

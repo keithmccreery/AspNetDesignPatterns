@@ -23,6 +23,35 @@ public class ResultHttpExtensionsTests
         type.ToStatusCode().Should().Be((int) expected);
     }
 
+    [TestCase(ErrorType.Validation, "One or more validation errors occurred.")]
+    [TestCase(ErrorType.Unauthorized, "Authentication is required.")]
+    [TestCase(ErrorType.Forbidden, "You do not have access to this resource.")]
+    [TestCase(ErrorType.NotFound, "The requested resource was not found.")]
+    [TestCase(ErrorType.Conflict, "The request conflicts with the current state.")]
+    [TestCase(ErrorType.Upstream, "An upstream dependency failed.")]
+    [TestCase(ErrorType.Failure, "An unexpected error occurred.")]
+    public void Maps_each_error_type_to_its_problem_title(ErrorType type, string expectedTitle)
+    {
+        // Arrange — only Validation/NotFound/Upstream ever actually occur in the sample app, so
+        // the rest of this mapping was untested; every ErrorType has its own factory to drive it.
+        Error error = type switch
+        {
+            ErrorType.Validation => Error.Validation("X", "x"),
+            ErrorType.Unauthorized => Error.Unauthorized("X", "x"),
+            ErrorType.Forbidden => Error.Forbidden("X", "x"),
+            ErrorType.NotFound => Error.NotFound("X", "x"),
+            ErrorType.Conflict => Error.Conflict("X", "x"),
+            ErrorType.Upstream => Error.Upstream("X", "x"),
+            _ => Error.Failure("X", "x"),
+        };
+
+        // Act
+        ProblemHttpResult problem = error.ToProblem().Should().BeOfType<ProblemHttpResult>().Subject;
+
+        // Assert
+        problem.ProblemDetails.Title.Should().Be(expectedTitle);
+    }
+
     [Test]
     public void Failure_result_becomes_a_ProblemDetails_carrying_the_error_code()
     {

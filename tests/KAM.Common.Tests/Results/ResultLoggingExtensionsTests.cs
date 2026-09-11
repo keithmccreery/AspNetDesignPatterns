@@ -99,6 +99,16 @@ public class ResultLoggingExtensionsTests
     }
 
     [Test]
+    public void LogError_is_a_no_op_for_a_success()
+    {
+        // Arrange & Act
+        Result.Success(1).LogError(_logger);
+
+        // Assert
+        _logger.Entries.Should().BeEmpty();
+    }
+
+    [Test]
     public async Task LogOnFailureAsync_awaits_then_logs()
     {
         // Arrange
@@ -109,6 +119,41 @@ public class ResultLoggingExtensionsTests
 
         // Assert
         _logger.Entries.Should().ContainSingle(e => e.Message.Contains("AsyncOp"));
+    }
+
+    [Test]
+    public async Task LogOnFailureAsync_awaits_a_non_generic_Result_task_then_logs()
+    {
+        // Arrange
+        Task<Result> task = Task.FromResult((Result) Error.Failure("E", "e"));
+
+        // Act
+        await task.LogOnFailureAsync(_logger, operation: "AsyncOp");
+
+        // Assert
+        _logger.Entries.Should().ContainSingle(e => e.Message.Contains("AsyncOp"));
+    }
+
+    [Test]
+    public async Task LogResultAsync_awaits_a_non_generic_Result_task_then_routes_by_outcome()
+    {
+        // Arrange & Act
+        await Task.FromResult(Result.Success()).LogResultAsync(_logger, operation: "A");
+        await Task.FromResult((Result) Error.Failure("E", "e")).LogResultAsync(_logger, operation: "B");
+
+        // Assert
+        _logger.Entries.Select(e => e.Level).Should().Equal(LogLevel.Information, LogLevel.Error);
+    }
+
+    [Test]
+    public async Task LogResultAsync_awaits_a_generic_Result_task_then_routes_by_outcome()
+    {
+        // Arrange & Act
+        await Task.FromResult(Result.Success(1)).LogResultAsync(_logger, operation: "A");
+        await Task.FromResult(Result.Failure<int>(Error.Failure("E", "e"))).LogResultAsync(_logger, operation: "B");
+
+        // Assert
+        _logger.Entries.Select(e => e.Level).Should().Equal(LogLevel.Information, LogLevel.Error);
     }
 
     private sealed class RecordingLogger : ILogger
