@@ -58,6 +58,19 @@ probes at `/health/live` + `/health/ready`.
    logger; they attach context to the `Error` and the boundary calls `result.LogOnFailure(logger)`.
 7. **Untrusted strings in logs**: the `ControlCharacterSanitizingEnricher` handles top-level
    scalars globally; don't put raw user input inside destructured (`{@obj}`) log payloads.
+8. **Every mapped endpoint declares its auth intent explicitly** — `.RequireAuthorization(...)`
+   or `.AllowAnonymous()`, never neither. Enforced twice: `EndpointAuthorizationTests`
+   (`tests/…/Integration/`) fails the build if one doesn't, and `FallbackPolicy` denies by
+   default at runtime as the backstop if that test is ever bypassed.
+
+## Dependencies
+
+Prefer a type already in the BCL / ASP.NET Core shared framework over a new NuGet package
+when it solves the same problem — e.g. `Microsoft.AspNetCore.WebUtilities.QueryHelpers` for a
+query string rather than Flurl, `IMemoryCache` rather than a hand-rolled cache. Reach for a
+third-party package when it's genuinely the standard tool for the job (FluentValidation,
+Polly, NetArchTest), not by default. This matters more as the repo grows into OpenTelemetry
+and cloud-provider SDKs — check the framework first.
 
 ## Style (enforced by `.editorconfig` + `dotnet format`)
 
