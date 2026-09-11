@@ -15,7 +15,7 @@ Both are **anonymous**, both are **hidden from the OpenAPI document**, both sit 
 | File | Type | Purpose |
 |---|---|---|
 | `HealthCheckTag.cs` | `static class` | The `Ready` / `Live` tag constants the endpoints filter on. |
-| `HealthCheckResponseWriter.cs` | `static` writer | Serializes a `HealthReport` to `{ status, totalDurationMs, entries: { name: { status, durationMs, description, error, tags } } }` using the app's shared `JsonSerializerOptions`. Exception **message** only, never a stack trace. |
+| `HealthCheckResponseWriter.cs` | `static` writer | Serializes a `HealthReport` to `{ status, totalDurationMs, entries: { name: { status, durationMs, description, error, tags } } }` using the app's shared `JsonSerializerOptions`. `description`/`error` (exception **message**, never a stack trace) are included only outside Production — both routes are anonymous, so a hand-written check `Description` or an `Exception.Message` (hostname, port, connection-string fragment) must not reach an unauthenticated caller in Production. |
 | `HealthCheckExtensions.cs` | `MapAppHealthChecks()` | Maps the two routes with the tag predicates and the response writer. |
 
 ## Wiring
@@ -48,6 +48,12 @@ services.AddHealthChecks().AddCheck<WeatherProviderHealthCheck>(
 - **A probe is one fast request.** `WeatherProviderHealthCheck` uses its own `HttpClient`
   with `RemoveAllResilienceHandlers()` and a short timeout, so a probe is not a retrying
   Polly pipeline.
+- **An anonymous readiness route must not be a free amplifier.** `/health/ready` takes no
+  credentials, so without a cache every request to it would drive one outbound call to
+  open-meteo. `WeatherProviderHealthCheck` caches its result for 15s via `IMemoryCache`
+  (`builder.Services.AddMemoryCache()` in `Program.cs`) — cheap insurance, and readiness
+  doesn't need fresher-than-a-few-seconds data anyway. A check with no external call (most of
+  them) doesn't need this.
 - **No third-party UI package.** `HealthCheckResponseWriter` is ~40 lines and gives full
   control of the shape; `AspNetCore.HealthChecks.UI.Client` would be the drop-in alternative
   if a dashboard needs its exact schema.
@@ -55,9 +61,11 @@ services.AddHealthChecks().AddCheck<WeatherProviderHealthCheck>(
 ## Tests
 
 - `tests/…/Shared/HealthChecks/HealthCheckResponseWriterTests.cs` — the JSON shape from a
-  synthetic `HealthReport`.
+  synthetic `HealthReport`, and that `description`/`error` are present outside Production and
+  omitted in Production.
 - `tests/…/Features/Weather/WeatherProviderHealthCheckTests.cs` — Healthy on 2xx, Degraded on
-  an error status or an unreachable host (fake `HttpMessageHandler`).
+  an error status or an unreachable host (fake `HttpMessageHandler`), and that a second probe
+  within the cache window doesn't call the provider again.
 - `tests/…/Integration/HealthCheckEndpointsTests.cs` — the real app: `/health/live` runs no
   checks, `/health/ready` runs the `ready`-tagged checks, neither appears in the OpenAPI doc.
   The integration factory stubs the weather probe's `HttpClient` so readiness is deterministic.

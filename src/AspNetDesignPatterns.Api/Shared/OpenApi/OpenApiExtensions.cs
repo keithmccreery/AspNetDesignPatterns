@@ -8,19 +8,29 @@ namespace AspNetDesignPatterns.Api.Shared.OpenApi;
 public static class OpenApiExtensions
 {
     /// <summary>
-    /// Serves one OpenAPI JSON per API version (<c>/openapi/v1.json</c>, …) and the Scalar UI
-    /// at <c>/scalar</c> (Development only). The document generator itself is registered by
-    /// <c>AddApiVersioning().AddOpenApi(...)</c> in <c>Program.cs</c>.
+    /// Serves one OpenAPI JSON per API version (<c>/openapi/v1.json</c>, …) outside Production,
+    /// and the Scalar UI at <c>/scalar</c> in Development only. The document generator itself
+    /// is registered by <c>AddApiVersioning().AddOpenApi(...)</c> in <c>Program.cs</c>.
     /// </summary>
+    /// <remarks>
+    /// The document is anonymous and lists every route plus the auth scheme description — fine
+    /// for a reference app, but the conservative default for a real API is to not publish your
+    /// full surface to the internet. Remove the <c>IsProduction</c> guard if your API doc is
+    /// meant to be public.
+    /// </remarks>
     public static WebApplication MapApiReference(this WebApplication app)
     {
-        app.MapOpenApi().WithDocumentPerVersion();
+        if (!app.Environment.IsProduction())
+        {
+            app.MapOpenApi().WithDocumentPerVersion().AllowAnonymous();
+        }
 
         if (app.Environment.IsDevelopment())
         {
             app.MapScalarApiReference(options => options
-                .WithTitle("AspNetDesignPatterns API")
-                .WithTheme(ScalarTheme.Mars));
+                    .WithTitle("AspNetDesignPatterns API")
+                    .WithTheme(ScalarTheme.Mars))
+                .AllowAnonymous();
         }
 
         return app;

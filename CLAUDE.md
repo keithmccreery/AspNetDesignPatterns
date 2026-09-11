@@ -13,7 +13,7 @@ and consistency matter more than cleverness. It grows one vertical-slice feature
 
 ```bash
 dotnet build                                  # analyzers run here; compiler warnings are errors
-dotnet test                                   # NUnit; 171 tests (incl. NetArchTest arch rules)
+dotnet test                                   # NUnit; 181 tests (incl. NetArchTest arch rules)
 dotnet format --verify-no-changes             # style + whitespace gate (CI)
 dotnet format                                 # apply style fixes
 dotnet run --project src/AspNetDesignPatterns.Api   # needs src/.../.env (copy .env.example)
@@ -104,7 +104,9 @@ same block also silences the XML-doc completeness/style family (`RCS1141`, `SA16
 - `tests/…/Architecture/` enforces the conventions in this file with NetArchTest (services
   return `Result`, only clients throw, no cross-feature deps, role types named + sealed).
   A failing arch test may mean the rule is too strict — fix whichever is at fault; if a rule
-  can't avoid false positives, delete it with a comment. See its README.
+  can't avoid false positives, delete it with a comment. See its README. Rules that need a
+  running host rather than static analysis (every endpoint declares an auth intent; the
+  OpenAPI/Scalar exposure gating) live as ordinary tests next to what they check instead.
 
 ## When adding a feature
 

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace AspNetDesignPatterns.Api.Features.Weather;
@@ -11,16 +12,34 @@ namespace AspNetDesignPatterns.Api.Features.Weather;
 /// <remarks>
 /// Uses its own <see cref="HttpClient"/> (registered in <see cref="WeatherDependencies"/> with
 /// the resilience handler removed and a short timeout) so a probe is one fast request, not a
-/// retrying Polly pipeline.
+/// retrying Polly pipeline. The result is cached for <see cref="CacheDuration"/>: <c>/health/ready</c>
+/// is anonymous, so without a cache every unauthenticated request drives one outbound call to
+/// open-meteo — a cost/traffic-amplification vector, and unnecessary besides (readiness does
+/// not need fresher-than-a-few-seconds data).
 /// </remarks>
-internal sealed class WeatherProviderHealthCheck(HttpClient httpClient) : IHealthCheck
+internal sealed class WeatherProviderHealthCheck(HttpClient httpClient, IMemoryCache cache) : IHealthCheck
 {
     // A minimal but valid forecast request: null island, one day. We only inspect the status.
     private const string PROBE_PATH = "/v1/forecast?latitude=0&longitude=0&forecast_days=1&timezone=UTC";
+    private const string CACHE_KEY = "AspNetDesignPatterns.HealthChecks.WeatherProvider";
+
+    private static readonly TimeSpan CacheDuration = TimeSpan.FromSeconds(15);
 
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
+    {
+        if (cache.TryGetValue(CACHE_KEY, out HealthCheckResult cached))
+        {
+            return cached;
+        }
+
+        HealthCheckResult result = await ProbeAsync(cancellationToken);
+        cache.Set(CACHE_KEY, result, CacheDuration);
+        return result;
+    }
+
+    private async Task<HealthCheckResult> ProbeAsync(CancellationToken cancellationToken)
     {
         try
         {

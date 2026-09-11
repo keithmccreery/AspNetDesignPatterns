@@ -109,7 +109,10 @@ builder.Services.AddHttpContextAccessor();
 
 // Health-check services. Individual checks self-register from the slice that owns them
 // (e.g. Features/Weather/WeatherDependencies); the two probes are mapped by MapAppHealthChecks().
+// AddMemoryCache() backs the short-lived caching a check may do (e.g. WeatherProviderHealthCheck)
+// so the anonymous /health/ready route can't be used to drive unlimited outbound calls.
 builder.Services.AddHealthChecks();
+builder.Services.AddMemoryCache();
 
 // FluentValidation validators — MUST be registered before AddSettings() so SettingsBase<T>
 // can detect them and choose the FluentValidation path over DataAnnotations.

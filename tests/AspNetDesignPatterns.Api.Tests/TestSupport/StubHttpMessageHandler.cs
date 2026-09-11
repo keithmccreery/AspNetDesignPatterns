@@ -7,7 +7,8 @@ namespace AspNetDesignPatterns.Api.Tests.TestSupport;
 /// <summary>
 /// A test <see cref="HttpMessageHandler"/> that answers every request with a fixed status code
 /// and body (or throws a supplied exception), so a typed client can be exercised without the
-/// network. Records the last request sent, so a test can assert on the URI a client built.
+/// network. Records the last request sent and how many were sent, so a test can assert on the
+/// URI a client built or that a cache actually prevented a second call.
 /// </summary>
 internal sealed class StubHttpMessageHandler : HttpMessageHandler
 {
@@ -25,9 +26,12 @@ internal sealed class StubHttpMessageHandler : HttpMessageHandler
 
     public HttpRequestMessage? LastRequest { get; private set; }
 
+    public int CallCount { get; private set; }
+
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         LastRequest = request;
+        CallCount++;
 
         if (_throw is not null)
         {

@@ -1,6 +1,7 @@
 using System.Text.Json;
 
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Hosting;
 
 namespace AspNetDesignPatterns.Api.Shared.HealthChecks;
 
@@ -10,9 +11,12 @@ namespace AspNetDesignPatterns.Api.Shared.HealthChecks;
 /// framework default (a bare <c>Healthy</c> string) or a third-party UI package.
 /// </summary>
 /// <remarks>
-/// Only the exception <em>message</em> is surfaced, never the stack trace. Health endpoints
-/// should be reachable only from inside the cluster; this keeps the blast radius small if one
-/// is ever exposed by mistake.
+/// The description/exception detail is included only outside Production. Health endpoints are
+/// anonymous by design (an orchestrator's probe carries no credentials), so this file is
+/// exactly the kind of "read and copy from" code where <c>Exception.Message</c> — a hostname,
+/// a port, a connection-string fragment, depending on what a future check wraps — must not be
+/// handed to an unauthenticated caller. Status and duration are enough for a probe; the detail
+/// is for whoever is looking at Scalar/logs in a non-Production environment.
 /// </remarks>
 internal static class HealthCheckResponseWriter
 {
@@ -21,6 +25,7 @@ internal static class HealthCheckResponseWriter
         context.Response.ContentType = "application/json; charset=utf-8";
 
         JsonSerializerOptions jsonOptions = context.RequestServices.GetRequiredService<JsonSerializerOptions>();
+        bool includeDetail = !context.RequestServices.GetRequiredService<IHostEnvironment>().IsProduction();
 
         HealthReportBody body = new(
             Status: report.Status.ToString(),
@@ -30,8 +35,8 @@ internal static class HealthCheckResponseWriter
                 entry => new HealthEntryBody(
                     Status: entry.Value.Status.ToString(),
                     DurationMs: entry.Value.Duration.TotalMilliseconds,
-                    Description: entry.Value.Description,
-                    Error: entry.Value.Exception?.Message,
+                    Description: includeDetail ? entry.Value.Description : null,
+                    Error: includeDetail ? entry.Value.Exception?.Message : null,
                     Tags: [.. entry.Value.Tags]),
                 StringComparer.Ordinal));
 

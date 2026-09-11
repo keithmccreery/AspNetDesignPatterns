@@ -11,6 +11,13 @@ The conventions in `CLAUDE.md` and the `Shared/` / `Features/` READMEs, enforced
 | `ConventionTests.cs` | Role types are named for their role (`…Endpoint`, `…Handler`, `…Step`, `…Options`, `…Validator`, `…HealthCheck`, `…Dependencies`) and sealed; endpoints don't reach past the handler into a service or client. |
 | `SanityTests.cs` | Guards against a rule passing **vacuously** — every predicate the other fixtures rely on is asserted to match at least one real type. |
 
+One rule lives outside this folder because it needs a running host, not static analysis:
+`tests/…/Integration/EndpointAuthorizationTests.cs` walks the real app's mapped endpoints and
+requires each one to declare `.RequireAuthorization(...)` or `.AllowAnonymous()` explicitly —
+whether an endpoint called one is invisible to a type-level rule; it only shows up in the
+endpoint metadata built at startup. `OpenApiExposureTests.cs` (`Shared/OpenApi/`) is the same
+idea for the Production/Development gating on the OpenAPI document and Scalar UI.
+
 ## Pieces
 
 - `ArchitectureRules.cs` — the assembly under test, the namespace-root constants, feature-slice
