@@ -13,7 +13,7 @@ and consistency matter more than cleverness. It grows one vertical-slice feature
 
 ```bash
 dotnet build                                  # analyzers run here; compiler warnings are errors
-dotnet test                                   # NUnit; 159 tests (incl. NetArchTest arch rules)
+dotnet test                                   # NUnit; 171 tests (incl. NetArchTest arch rules)
 dotnet format --verify-no-changes             # style + whitespace gate (CI)
 dotnet format                                 # apply style fixes
 dotnet run --project src/AspNetDesignPatterns.Api   # needs src/.../.env (copy .env.example)

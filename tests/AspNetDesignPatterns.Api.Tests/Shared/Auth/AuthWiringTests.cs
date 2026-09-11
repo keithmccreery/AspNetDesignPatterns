@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 
 using AspNetDesignPatterns.Api.Shared.Auth;
 
@@ -44,7 +45,7 @@ public class AuthExtensionsTests
     }
 
     [Test]
-    public async Task Registers_the_weather_read_policy_requiring_the_scope_claim()
+    public async Task Registers_the_weather_read_policy_denying_anonymous_users()
     {
         // Arrange
         using ServiceProvider provider = BuildProvider();
@@ -54,13 +55,35 @@ public class AuthExtensionsTests
         AuthorizationPolicy? policy = await policyProvider.GetPolicyAsync(AuthorizationPolicies.WeatherRead);
 
         // Assert
+        policy!.Requirements.Should().Contain(r => r is DenyAnonymousAuthorizationRequirement);
+    }
+
+    [Test]
+    public async Task Registers_the_weather_read_policy_accepting_either_scope_claim_shape()
+    {
+        // Arrange — a RequireClaim("scope", "weather:read") policy (what this used to be) only
+        // matches a claim whose value is exactly "weather:read"; a real IdP sends one
+        // space-delimited scope claim, which that check rejects. This proves the fix.
+        using ServiceProvider provider = BuildProvider();
+        IAuthorizationPolicyProvider policyProvider = provider.GetRequiredService<IAuthorizationPolicyProvider>();
+        AuthorizationPolicy? policy = await policyProvider.GetPolicyAsync(AuthorizationPolicies.WeatherRead);
+        AssertionRequirement assertion = policy!.Requirements.OfType<AssertionRequirement>().Single();
+
+        // Act & Assert
         using (new AssertionScope())
         {
-            policy.Should().NotBeNull();
-            policy!.Requirements.Should().Contain(r => r is DenyAnonymousAuthorizationRequirement);
-            policy.Requirements.OfType<ClaimsAuthorizationRequirement>()
-                .Should().Contain(r => r.ClaimType == "scope" && r.AllowedValues!.Contains("weather:read"));
+            (await Satisfies(assertion, "weather:read")).Should().BeTrue("an exact single scope claim must match");
+            (await Satisfies(assertion, "weather:read openid profile")).Should().BeTrue(
+                "a standard space-delimited scope claim (what a real IdP sends) must match");
+            (await Satisfies(assertion, "openid profile")).Should().BeFalse("the required scope is absent");
         }
+    }
+
+    private static Task<bool> Satisfies(AssertionRequirement assertion, string scopeClaimValue)
+    {
+        ClaimsPrincipal user = new(new ClaimsIdentity([new Claim("scope", scopeClaimValue)], "test"));
+        AuthorizationHandlerContext context = new([assertion], user, resource: null);
+        return assertion.Handler(context);
     }
 
     [Test]

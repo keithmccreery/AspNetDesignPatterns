@@ -32,7 +32,7 @@ internal sealed class DevTokenIssuer(IOptions<JwtOptions> jwtOptions, TimeProvid
             [
                 new Claim(JwtRegisteredClaimNames.Sub, subject),
                 new Claim(ClaimTypes.Name, subject),
-                .. AuthorizationPolicies.DefaultScopes.Select(s => new Claim("scope", s)),
+                new Claim("scope", string.Join(' ', Scopes.Default)), // standard OAuth2 shape: one space-delimited claim
             ]),
             SigningCredentials = new SigningCredentials(
                 new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwt.SigningKey)),

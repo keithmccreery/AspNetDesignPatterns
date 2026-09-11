@@ -49,7 +49,7 @@ public static class AuthExtensions
         {
             options.AddPolicy(AuthorizationPolicies.WeatherRead, policy => policy
                 .RequireAuthenticatedUser()
-                .RequireClaim("scope", AuthorizationPolicies.WeatherRead));
+                .RequireAssertion(context => ScopeClaims.Has(context.User, Scopes.WeatherRead)));
 
             options.FallbackPolicy = null;
         });

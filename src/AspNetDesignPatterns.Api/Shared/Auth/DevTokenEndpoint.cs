@@ -1,4 +1,5 @@
 using AspNetDesignPatterns.Api.DependencyInjection;
+using AspNetDesignPatterns.Api.Shared.FluentValidations;
 
 namespace AspNetDesignPatterns.Api.Shared.Auth;
 
@@ -23,6 +24,7 @@ internal sealed class DevTokenEndpoint : IEndpoint
             .WithTags("Auth")
             .WithSummary("Issue a development JWT (Development environment only).")
             .AllowAnonymous()
+            .ValidateRequest<TokenRequest>()
             .Produces<TokenResponse>();
     }
 }
