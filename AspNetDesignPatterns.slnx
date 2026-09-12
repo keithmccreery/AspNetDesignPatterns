@@ -4,7 +4,14 @@
     <Project Path="src/KAM.Common/KAM.Common.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/AspNetDesignPatterns.Api.Tests/AspNetDesignPatterns.Api.Tests.csproj" />
-    <Project Path="tests/KAM.Common.Tests/KAM.Common.Tests.csproj" />
+    <!-- Excluded from Release builds (any platform): a reference sample never ships a Release
+         artifact containing test code, and Release CI/local builds shouldn't need the test-only
+         packages (NUnit, NSubstitute, ...) restored at all. Debug still builds + runs them. -->
+    <Project Path="tests/AspNetDesignPatterns.Api.Tests/AspNetDesignPatterns.Api.Tests.csproj">
+      <Build Solution="Release|*" Project="false" />
+    </Project>
+    <Project Path="tests/KAM.Common.Tests/KAM.Common.Tests.csproj">
+      <Build Solution="Release|*" Project="false" />
+    </Project>
   </Folder>
 </Solution>

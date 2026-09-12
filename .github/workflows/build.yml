@@ -1,0 +1,68 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  debug:
+    name: Debug build + test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Nerdbank.GitVersioning computes the version from git history (commit height since
+          # version.json last changed) -- a shallow clone would under-count it.
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Build (Debug)
+        run: dotnet build --configuration Debug
+
+      # Tests only ever run against the Debug build -- see AspNetDesignPatterns.slnx, which
+      # excludes both test projects from Release entirely (CLAUDE.md's Commands section).
+      - name: Test (Debug)
+        run: dotnet test --configuration Debug --no-build
+
+      - name: Verify formatting
+        run: dotnet format --verify-no-changes
+
+      - name: Verify analyzers
+        run: dotnet format analyzers --verify-no-changes --severity warn
+
+  release:
+    name: Release build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore local tools (nbgv)
+        run: dotnet tool restore
+
+      - name: Show computed version
+        run: dotnet nbgv get-version
+
+      # AspNetDesignPatterns.slnx excludes both test projects from Release, so this builds only
+      # the two src/ projects -- no test-only packages (NUnit, NSubstitute, ...) restored at all.
+      # Nothing is published/deployed yet; this just proves the Release configuration builds clean.
+      - name: Build (Release)
+        run: dotnet build --configuration Release

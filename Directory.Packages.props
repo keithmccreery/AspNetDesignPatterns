@@ -34,6 +34,13 @@
     <PackageVersion Include="Serilog.Sinks.OpenTelemetry" Version="4.2.0" />
   </ItemGroup>
 
+  <ItemGroup Label="Versioning">
+    <!-- Stamps AssemblyVersion/AssemblyInformationalVersion from git height + commit, repo-wide
+         (Directory.Build.props), configured by version.json. TelemetryExtensions.ResolveServiceVersion
+         reads exactly the value this produces. -->
+    <PackageVersion Include="Nerdbank.GitVersioning" Version="3.10.94" />
+  </ItemGroup>
+
   <ItemGroup Label="Analyzers">
     <PackageVersion Include="Meziantou.Analyzer" Version="3.0.231" />
     <PackageVersion Include="ErrorProne.NET.CoreAnalyzers" Version="0.9.0-beta.4" />

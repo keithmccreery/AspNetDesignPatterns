@@ -75,6 +75,12 @@ dotnet format --verify-no-changes          # style + whitespace, gated in CI
 dotnet format analyzers --severity info     # see the advisory analyzer backlog
 ```
 
+**CI** (`.github/workflows/build.yml`, manually runnable too): a `debug` job builds + tests +
+runs both format gates; a separate `release` job builds `--configuration Release` — which
+[`AspNetDesignPatterns.slnx`](AspNetDesignPatterns.slnx) restricts to the two `src/` projects
+only (tests are excluded from that configuration entirely). Nothing is published from the
+Release build yet.
+
 ## Solution layout
 
 Two projects on the `src/` side, split so the reusable half can never (even by accident)
@@ -84,6 +90,8 @@ for why, and what that boundary actually cost when it was introduced.
 
 ```
 Directory.Build.props / Directory.Packages.props   shared build settings + central package versions
+version.json                           Nerdbank.GitVersioning config — see Directory.Build.props
+.github/workflows/build.yml            CI: Debug build+test+format, separate Release-build-only job
 src/AspNetDesignPatterns.Api/          the host — depends on the project below, never the other way
   Program.cs                 banner-organized composition root: .env, ProblemDetails, JSON,
                              Serilog, versioning + OpenAPI, auth, then the reflection scans
@@ -137,6 +145,7 @@ next to the code. `src/KAM.Common/README.md` and `DependencyInjection/README.md`
 | **DI graph validation** | `UseDefaultServiceProvider(ValidateOnBuild = true, ValidateScopes = true)` — startup fails on a mis-wired or captive dependency. | `Program.cs` |
 | **OpenTelemetry (traces + metrics + logs)** | ASP.NET Core + `HttpClient` + .NET runtime instrumentation, exported via OTLP; Serilog gains one more sink so logs are correlated to the same traces; a shared `ActivitySource` gives one span per `Pipeline<TContext>` step. Fails silently (dropped batches, nothing thrown) with no collector running — verified live. `docker compose up -d` runs a local .NET Aspire Dashboard to view it all. | [`Telemetry/`](src/KAM.Common/Telemetry), [`docker-compose.yml`](docker-compose.yml) |
 | **Architecture tests** | The conventions enforced as tests: services return `Result`, only clients throw, no cross-feature dependencies, role types named + sealed (NetArchTest, static analysis) — plus every mapped endpoint declares an explicit auth intent, and the OpenAPI/Scalar exposure gating holds (built against a real host, since that's invisible to static analysis). | [`tests/…/Architecture/`](tests/AspNetDesignPatterns.Api.Tests/Architecture) |
+| **Versioning + CI** | Nerdbank.GitVersioning stamps `AssemblyVersion`/`AssemblyInformationalVersion` from git height + commit — no version to bump by hand. GitHub Actions runs a Debug build+test+format job and a separate Release-build-only job (manually runnable via `workflow_dispatch` too). | [`version.json`](version.json), [`.github/workflows/build.yml`](.github/workflows/build.yml) |
 
 For a narrated walk-through of how a single request touches all of the above, read
 **[`Features/Weather/README.md`](src/AspNetDesignPatterns.Api/Features/Weather/README.md)** —

@@ -35,6 +35,18 @@
   </PropertyGroup>
 
   <!--
+    Nerdbank.GitVersioning, applied to every project (build-time only — PrivateAssets="all").
+    Computes AssemblyVersion/AssemblyInformationalVersion from version.json + git height/commit;
+    no version needs to change here or in any csproj. TelemetryExtensions.ResolveServiceVersion
+    reads exactly the InformationalVersion this produces.
+  -->
+  <ItemGroup Label="Versioning">
+    <PackageReference Include="Nerdbank.GitVersioning">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!--
     Analyzer suites, applied to every project. PrivateAssets="all" keeps them from flowing
     to consumers; IncludeAssets excludes the runtime so only the analyzer + build assets load.
   -->

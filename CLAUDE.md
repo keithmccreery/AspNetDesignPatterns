@@ -12,7 +12,8 @@ and consistency matter more than cleverness. It grows one vertical-slice feature
 ## Commands
 
 ```bash
-dotnet build                                  # builds both src projects; compiler warnings are errors
+dotnet build                                  # Debug (default): all 4 projects; compiler warnings are errors
+dotnet build --configuration Release          # Release: only the 2 src projects -- see below
 dotnet test                                   # NUnit, both test projects (incl. NetArchTest arch rules)
 dotnet format --verify-no-changes             # style + whitespace gate (CI)
 dotnet format                                 # apply style fixes
@@ -21,6 +22,22 @@ dotnet run --project src/AspNetDesignPatterns.Api   # needs src/.../.env (copy .
 # single test
 dotnet test --filter "FullyQualifiedName~ResultCompositionTests"
 ```
+
+**Release excludes both test projects** — `AspNetDesignPatterns.slnx` marks
+`AspNetDesignPatterns.Api.Tests`/`KAM.Common.Tests` `Build="false"` for the Release solution
+configuration (any platform), so `dotnet build -c Release` restores and builds only the two
+`src/` projects — no test-only packages (NUnit, NSubstitute, …) even get restored. Tests only
+ever run against the Debug build (`dotnet test` defaults to Debug); there's no `dotnet test -c
+Release`. This is also why CI (`.github/workflows/build.yml`) has separate `debug` (build + test
++ format gates) and `release` (build only, nothing published yet) jobs rather than one that
+tries to do both configurations in a single build.
+
+**Versioning**: Nerdbank.GitVersioning (`version.json` at the repo root, wired into every
+project via `Directory.Build.props`) stamps `AssemblyVersion`/`AssemblyInformationalVersion`
+from git height + commit — no version to bump by hand anywhere. `TelemetryExtensions.
+ResolveServiceVersion` reads exactly this value. `dotnet tool restore && dotnet nbgv
+get-version` shows the computed version locally (the local tool manifest is
+`.config/dotnet-tools.json`); CI's `release` job prints it the same way.
 
 Running the app: copy `src/AspNetDesignPatterns.Api/.env.example` → `.env`, set
 `Jwt__SigningKey` (≥32 chars). Scalar UI at `/scalar`, OpenAPI at `/openapi/v1.json`,
