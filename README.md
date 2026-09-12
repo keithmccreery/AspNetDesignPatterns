@@ -43,6 +43,10 @@ Then:
 `GET /api/v1/weather/forecast` proxies the public [open-meteo](https://open-meteo.com) API,
 so it needs outbound network access; the tests do not.
 
+**Optional — view traces/logs/metrics**: `docker compose up -d` runs a local .NET Aspire
+Dashboard at <http://localhost:18888>; the app's OTLP export already points at it by default.
+Skip this step entirely and the app runs identically — see [`Telemetry/`](src/KAM.Common/Telemetry).
+
 ## Testing
 
 ```bash
@@ -89,8 +93,8 @@ src/AspNetDesignPatterns.Api/          the host — depends on the project below
 src/KAM.Common/             reusable, no reference to the project above — see its own README
   DependencyInjection/       reflection-registration conventions — see DependencyInjection/README.md
   Authentication/ Authorization/ Cors/ Results/ Pipeline/ FluentValidations/ Logging/
-  OpenApi/ Configuration/ Handlers/ HealthChecks/  cross-cutting building blocks, one
-                             top-level folder per concern (each has its own README.md)
+  OpenApi/ Configuration/ Handlers/ HealthChecks/ Telemetry/  cross-cutting building blocks,
+                             one top-level folder per concern (each has its own README.md)
 tests/AspNetDesignPatterns.Api.Tests/  tests AspNetDesignPatterns.Api (+ the two wired together)
   GlobalTestSetup.cs         [SetUpFixture] owning the one shared WebApplicationFactory
   TestSupport/               shared test doubles (currently just StubHttpMessageHandler)
@@ -131,6 +135,7 @@ next to the code. `src/KAM.Common/README.md` and `DependencyInjection/README.md`
 | **CORS** | A single named policy configured from `appsettings.json`; `"*"` means "any" for headers/methods (not a literal value), and a `"*"` origin can't combine with credentials — both enforced at startup, not as a runtime browser surprise. | [`Cors/`](src/KAM.Common/Cors) |
 | **Health checks** | `/health/live` (no checks) and `/health/ready` (checks tagged `ready`), split by intent, with a small custom JSON writer that hides descriptions/exception messages in Production. Checks self-register from the owning slice and cache anything that calls out over the network, since the routes are anonymous. | [`HealthChecks/`](src/KAM.Common/HealthChecks), [`Features/Weather/WeatherProviderHealthCheck.cs`](src/AspNetDesignPatterns.Api/Features/Weather/WeatherProviderHealthCheck.cs) |
 | **DI graph validation** | `UseDefaultServiceProvider(ValidateOnBuild = true, ValidateScopes = true)` — startup fails on a mis-wired or captive dependency. | `Program.cs` |
+| **OpenTelemetry (traces + metrics + logs)** | ASP.NET Core + `HttpClient` + .NET runtime instrumentation, exported via OTLP; Serilog gains one more sink so logs are correlated to the same traces; a shared `ActivitySource` gives one span per `Pipeline<TContext>` step. Fails silently (dropped batches, nothing thrown) with no collector running — verified live. `docker compose up -d` runs a local .NET Aspire Dashboard to view it all. | [`Telemetry/`](src/KAM.Common/Telemetry), [`docker-compose.yml`](docker-compose.yml) |
 | **Architecture tests** | The conventions enforced as tests: services return `Result`, only clients throw, no cross-feature dependencies, role types named + sealed (NetArchTest, static analysis) — plus every mapped endpoint declares an explicit auth intent, and the OpenAPI/Scalar exposure gating holds (built against a real host, since that's invisible to static analysis). | [`tests/…/Architecture/`](tests/AspNetDesignPatterns.Api.Tests/Architecture) |
 
 For a narrated walk-through of how a single request touches all of the above, read

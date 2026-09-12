@@ -1,10 +1,15 @@
+using System.Diagnostics;
+
+using KAM.Common.Telemetry;
+
 namespace KAM.Common.Pipeline;
 
 /// <summary>
 /// Executes an ordered chain of <see cref="IPipelineStep{TContext}"/> instances, resolving
 /// each one from DI at execution time. Steps are composed as middleware (each receives a
 /// <c>next</c> delegate); the chain stops at the first step that returns a failed
-/// <see cref="Result"/> or does not call <c>next</c>.
+/// <see cref="Result"/> or does not call <c>next</c>. Each step runs inside its own span (see
+/// <see cref="ActivitySources.Pipeline"/>) — free when nothing's listening for it.
 /// </summary>
 public sealed class Pipeline<TContext>(IServiceProvider serviceProvider)
 {
@@ -31,18 +36,20 @@ public sealed class Pipeline<TContext>(IServiceProvider serviceProvider)
     {
         int index = 0;
 
-        Task<Result> NextAsync(CancellationToken token)
+        async Task<Result> NextAsync(CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
 
             if (index >= _stepTypes.Count)
             {
-                return Task.FromResult(Result.Success());
+                return Result.Success();
             }
 
             Type stepType = _stepTypes[index++];
             IPipelineStep<TContext> step = (IPipelineStep<TContext>) _serviceProvider.GetRequiredService(stepType);
-            return step.ExecuteAsync(context, NextAsync, token);
+
+            using Activity? activity = ActivitySources.Pipeline.StartActivity(stepType.Name);
+            return await step.ExecuteAsync(context, NextAsync, token);
         }
 
         return NextAsync(cancellationToken);

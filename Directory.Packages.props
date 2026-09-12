@@ -24,6 +24,14 @@
     <!-- Serilog core: referenced directly by KAM.Common (the log-injection
          enricher implements ILogEventEnricher), not just pulled in transitively via Serilog.AspNetCore. -->
     <PackageVersion Include="Serilog" Version="4.3.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.18.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.18.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.18.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.18.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.18.0" />
+    <!-- Logs stay on Serilog (the ILoggerFactory everywhere else in the app); this sink is the
+         one extra WriteTo that also ships them to the OTLP collector, correlated to the active trace. -->
+    <PackageVersion Include="Serilog.Sinks.OpenTelemetry" Version="4.2.0" />
   </ItemGroup>
 
   <ItemGroup Label="Analyzers">

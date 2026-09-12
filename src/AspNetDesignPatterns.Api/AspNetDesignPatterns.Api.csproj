@@ -24,6 +24,10 @@
     <PackageReference Include="Serilog.Settings.Configuration" />
     <PackageReference Include="Serilog.Sinks.Console" />
     <PackageReference Include="Serilog.Sinks.File" />
+    <!-- The one fluent sink in an otherwise declarative (appsettings.json) Serilog config:
+         it shares KAM.Common.Telemetry.TelemetrySettings.OtlpEndpoint with the trace/metric
+         exporters, so one config value drives all three signals to the same collector. -->
+    <PackageReference Include="Serilog.Sinks.OpenTelemetry" />
   </ItemGroup>
 
   <ItemGroup>

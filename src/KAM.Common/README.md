@@ -17,6 +17,7 @@ knows a feature exists. Every folder here is a top-level namespace under `KAM.Co
 | [`Configuration/`](Configuration/README.md) | `KAM.Common.Configuration` | "Where/how am I running" view of the environment. |
 | [`OpenApi/`](OpenApi/README.md) | `KAM.Common.OpenApi` | OpenAPI document + Scalar UI + JWT security scheme. |
 | [`Handlers/`](Handlers/README.md) | `KAM.Common.Handlers` | The `IRequestHandler<TRequest, TResponse>` abstraction. |
+| [`Telemetry/`](Telemetry/README.md) | `KAM.Common.Telemetry` | OpenTelemetry traces + metrics (OTLP), a shared `ActivitySource` for custom spans, and the settings the log sink shares with them. |
 
 ## Why this is a separate project — and why it's named `KAM.Common`, not `AspNetDesignPatterns.*`
 

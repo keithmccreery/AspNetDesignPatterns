@@ -1,0 +1,17 @@
+# Local OpenTelemetry viewer for `dotnet run` — traces, metrics, and logs in one UI, no signup.
+# `docker compose up -d`, then open http://localhost:18888. The app's default OTLP endpoint
+# (http://localhost:4317, unset Telemetry:OtlpEndpoint in appsettings.json) already points here —
+# nothing else to configure. If this container isn't running, the app still starts and serves
+# requests normally: the OTLP exporter drops failed exports on a background thread rather than
+# throwing (see KAM.Common/Telemetry/README.md).
+services:
+  aspire-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:latest
+    container_name: aspnetdesignpatterns-aspire-dashboard
+    ports:
+      - "18888:18888" # dashboard UI
+      - "4317:18889" # OTLP/gRPC ingest — matches the SDK's own default endpoint
+    environment:
+      # The dashboard normally requires a login token printed to its container logs; this repo
+      # is local-only, so skip that friction. Do not do this for anything internet-reachable.
+      - DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true

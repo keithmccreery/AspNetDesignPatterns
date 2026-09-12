@@ -26,6 +26,9 @@ Running the app: copy `src/AspNetDesignPatterns.Api/.env.example` → `.env`, se
 `Jwt__SigningKey` (≥32 chars). Scalar UI at `/scalar`, OpenAPI at `/openapi/v1.json`,
 probes at `/health/live` + `/health/ready`.
 `GET /api/v1/weather/forecast` proxies the live open-meteo API (needs network); tests fake it.
+Optional: `docker compose up -d` runs a local OTLP collector (.NET Aspire Dashboard,
+`localhost:18888`) for traces/logs/metrics — the app runs identically without it (see
+`KAM.Common/Telemetry/README.md`).
 
 ## Architecture
 
@@ -39,12 +42,13 @@ probes at `/health/live` + `/health/ready`.
   endpoint, request+validator, response DTO, handler, service, client, options, pipeline steps.
 - **Cross-cutting building blocks** (in `KAM.Common`) — one top-level folder per concern
   (`Results/`, `Pipeline/`, `Authentication/`, `Authorization/`, `Cors/`, `HealthChecks/`,
-  `OpenApi/`, `Logging/`, `FluentValidations/`, `Configuration/`, `Handlers/`), each with a
-  README. Infrastructure that is genuinely cross-cutting (auth, CORS, OpenAPI, health checks)
-  *is* wired in `Program.cs`; only *feature* registration goes through the reflection scans /
-  `IDependency`. A type a reflection scan needs to see from `Program.cs` but that should stay
-  `internal` gets its own registration extension (e.g. `AddGlobalExceptionHandler()`) rather
-  than being made `public` just to be nameable across the project boundary.
+  `OpenApi/`, `Logging/`, `FluentValidations/`, `Configuration/`, `Handlers/`, `Telemetry/`),
+  each with a README. Infrastructure that is genuinely cross-cutting (auth, CORS, OpenAPI,
+  health checks, telemetry) *is* wired in `Program.cs`; only *feature* registration goes
+  through the reflection scans / `IDependency`. A type a reflection scan needs to see from
+  `Program.cs` but that should stay `internal` gets its own registration extension (e.g.
+  `AddGlobalExceptionHandler()`) rather than being made `public` just to be nameable across
+  the project boundary.
 - **`Authentication/` vs `Authorization/`** — deliberately separate, and deliberately named to
   say so (not the ambiguous "Auth"): `Authentication/` is who the caller is (JWT bearer
   validation, the dev-token endpoint); `Authorization/` is what they can do, expressed as
@@ -98,8 +102,12 @@ Prefer a type already in the BCL / ASP.NET Core shared framework over a new NuGe
 when it solves the same problem — e.g. `Microsoft.AspNetCore.WebUtilities.QueryHelpers` for a
 query string rather than Flurl, `IMemoryCache` rather than a hand-rolled cache. Reach for a
 third-party package when it's genuinely the standard tool for the job (FluentValidation,
-Polly, NetArchTest), not by default. This matters more as the repo grows into OpenTelemetry
-and cloud-provider SDKs — check the framework first.
+Polly, NetArchTest, OpenTelemetry), not by default — and even then, check what the framework
+already emits for free first: ASP.NET Core and `HttpClient` produce `Activity` spans natively
+(OpenTelemetry's SDK packages just export what's already there), so `Telemetry/` only adds
+code for the runtime instrumentation package and the handful of custom spans nothing else
+would emit. This matters more as the repo grows into cloud-provider SDKs — check the
+framework first.
 
 ## Style (enforced by `.editorconfig` + `dotnet format`)
 

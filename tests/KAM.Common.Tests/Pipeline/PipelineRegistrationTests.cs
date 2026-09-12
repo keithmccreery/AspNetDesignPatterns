@@ -1,5 +1,8 @@
+using System.Diagnostics;
+
 using KAM.Common.Pipeline;
 using KAM.Common.Results;
+using KAM.Common.Telemetry;
 
 using Microsoft.Extensions.DependencyInjection;
 
@@ -86,6 +89,36 @@ public class PipelineFactoryTests
             result.IsSuccess.Should().BeTrue();
             context.Value.Should().Be(12);
         }
+    }
+
+    [Test]
+    public async Task Each_step_runs_inside_its_own_span_when_something_is_listening()
+    {
+        // Arrange — no listener is registered in any other test in this file, so those prove
+        // the free/no-op path (see ActivitySources's own remarks); this proves the span itself.
+        // Reading the name *before* registering the listener matters: ActivitySource notifies
+        // every registered listener synchronously from its own constructor, so a listener whose
+        // predicate reads ActivitySources.Pipeline (instead of a captured local) risks re-entering
+        // that static field before the assignment which is constructing it completes.
+        string pipelineSourceName = ActivitySources.Pipeline.Name;
+        List<string?> spanNames = [];
+        using ActivityListener listener = new()
+        {
+            ShouldListenTo = source => source.Name == pipelineSourceName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+            ActivityStarted = activity => spanNames.Add(activity.OperationName),
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        using ServiceProvider provider = BuildProvider();
+        IPipelineFactory factory = provider.GetRequiredService<IPipelineFactory>();
+        Pipeline<Ctx> pipeline = factory.CreateBuilder<Ctx>().Use<AddOneStep>().Use<DoubleStep>().Build();
+
+        // Act
+        await pipeline.ExecuteAsync(new Ctx { Value = 1 }, CancellationToken.None);
+
+        // Assert
+        spanNames.Should().Equal(nameof(AddOneStep), nameof(DoubleStep));
     }
 
     [Test]

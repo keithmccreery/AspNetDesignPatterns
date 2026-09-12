@@ -18,6 +18,7 @@ using KAM.Common.DependencyInjection;
 using KAM.Common.HealthChecks;
 using KAM.Common.Logging;
 using KAM.Common.OpenApi;
+using KAM.Common.Telemetry;
 
 using Serilog;
 
@@ -39,6 +40,17 @@ builder.Host.UseDefaultServiceProvider(options =>
 // "Where and how am I running" — built once, used for Kestrel + Scalar gating, then shared.
 AppEnvironment appEnvironment = new(builder.Environment);
 builder.Services.AddSingleton(appEnvironment);
+
+// This app's own identity for telemetry — shared by the Serilog sink and AddAppTelemetry()
+// below so logs, traces, and metrics all show the same service in the collector/dashboard.
+// A literal here, never a KAM.Common default: the library has no identity of its own to report.
+const string SERVICE_NAME = "AspNetDesignPatterns.Api";
+
+// Bound directly from configuration (not via IOptions<T>) because both the Serilog sink below
+// and AddAppTelemetry() need it before the DI container is built. It's also a normal
+// SettingsBase<T>, so AddSettings() further down registers IOptions<TelemetrySettings> too —
+// this early bind is only for the two call sites that can't wait for that.
+TelemetrySettings telemetry = builder.Configuration.GetSection(TelemetrySettings.Section).Get<TelemetrySettings>() ?? new();
 
 // Global exception handling → RFC 9457 ProblemDetails (see GlobalExceptionHandler).
 builder.Services.AddGlobalExceptionHandler();
@@ -76,11 +88,33 @@ builder.WebHost.ConfigureKestrel(options =>
 
 // Serilog becomes the ILoggerFactory; the rest of the app depends only on ILogger<T>.
 // The ControlCharacterSanitizingEnricher strips CR/LF from every event (CWE-117 log injection).
-builder.Services.AddSerilog((services, configuration) => configuration
-    .ReadFrom.Configuration(builder.Configuration)
-    .ReadFrom.Services(services)
-    .Enrich.FromLogContext()
-    .Enrich.With<ControlCharacterSanitizingEnricher>());
+// The OpenTelemetry sink is the one fluent addition to an otherwise declarative
+// (appsettings.json) Serilog config — every LogOnFailure(logger) call ships to the same OTLP
+// collector as the traces/metrics below, correlated to the active trace automatically.
+builder.Services.AddSerilog((services, configuration) =>
+{
+    configuration
+        .ReadFrom.Configuration(builder.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext()
+        .Enrich.With<ControlCharacterSanitizingEnricher>();
+
+    if (telemetry.Enabled)
+    {
+        configuration.WriteTo.OpenTelemetry(options =>
+        {
+            // Without this, logs report as "unknown_service:AspNetDesignPatterns.Api" instead
+            // of matching the clean service name ConfigureResource(...) gives the traces/metrics
+            // exported by AddAppTelemetry() below — this sink has its own, separate resource.
+            options.ResourceAttributes["service.name"] = SERVICE_NAME;
+
+            if (telemetry.OtlpEndpoint is not null)
+            {
+                options.Endpoint = telemetry.OtlpEndpoint;
+            }
+        });
+    }
+});
 
 // Every typed HttpClient gets a User-Agent and the standard Polly resilience pipeline.
 builder.Services.ConfigureHttpClientDefaults(http =>
@@ -114,6 +148,11 @@ builder.Services.AddCorsPolicy();
 builder.Services.AddJwtAuth();
 builder.Services.AddPolicyDrivenAuthorization();
 builder.Services.AddHttpContextAccessor();
+
+// Traces (ASP.NET Core + HttpClient + one span per Pipeline<TContext> step) and metrics
+// (+ .NET runtime counters), exported via OTLP alongside the Serilog sink above. This app's
+// own name is passed in — KAM.Common has no identity of its own to report as the service.
+builder.Services.AddAppTelemetry(SERVICE_NAME, telemetry);
 
 // Health-check services. Individual checks self-register from the slice that owns them
 // (e.g. Features/Weather/WeatherDependencies); the two probes are mapped by MapAppHealthChecks().
