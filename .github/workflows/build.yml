@@ -10,6 +10,11 @@ on:
 permissions:
   contents: read
 
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  SOLUTION_PATH: AspNetDesignPatterns.slnx
+
 jobs:
   debug:
     name: Debug build + test
@@ -28,18 +33,18 @@ jobs:
           global-json-file: global.json
 
       - name: Build (Debug)
-        run: dotnet build --configuration Debug
+        run: dotnet build "$SOLUTION_PATH" --configuration Debug
 
       # Tests only ever run against the Debug build -- see AspNetDesignPatterns.slnx, which
       # excludes both test projects from Release entirely (CLAUDE.md's Commands section).
       - name: Test (Debug)
-        run: dotnet test --configuration Debug --no-build
+        run: dotnet test "$SOLUTION_PATH" --configuration Debug --no-build
 
       - name: Verify formatting
-        run: dotnet format --verify-no-changes
+        run: dotnet format "$SOLUTION_PATH" --verify-no-changes
 
       - name: Verify analyzers
-        run: dotnet format analyzers --verify-no-changes --severity warn
+        run: dotnet format analyzers "$SOLUTION_PATH" --verify-no-changes --severity warn
 
   release:
     name: Release build
@@ -65,4 +70,4 @@ jobs:
       # the two src/ projects -- no test-only packages (NUnit, NSubstitute, ...) restored at all.
       # Nothing is published/deployed yet; this just proves the Release configuration builds clean.
       - name: Build (Release)
-        run: dotnet build --configuration Release
+        run: dotnet build "$SOLUTION_PATH" --configuration Release
