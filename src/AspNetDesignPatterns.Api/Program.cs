@@ -41,16 +41,17 @@ builder.Host.UseDefaultServiceProvider(options =>
 AppEnvironment appEnvironment = new(builder.Environment);
 builder.Services.AddSingleton(appEnvironment);
 
-// This app's own identity for telemetry — shared by the Serilog sink and AddAppTelemetry()
-// below so logs, traces, and metrics all show the same service in the collector/dashboard.
-// A literal here, never a KAM.Common default: the library has no identity of its own to report.
-const string SERVICE_NAME = "AspNetDesignPatterns.Api";
-
 // Bound directly from configuration (not via IOptions<T>) because both the Serilog sink below
 // and AddAppTelemetry() need it before the DI container is built. It's also a normal
 // SettingsBase<T>, so AddSettings() further down registers IOptions<TelemetrySettings> too —
 // this early bind is only for the two call sites that can't wait for that.
 TelemetrySettings telemetry = builder.Configuration.GetSection(TelemetrySettings.Section).Get<TelemetrySettings>() ?? new();
+
+// Resolved once, shared by the Serilog sink and AddAppTelemetry() below, so logs and
+// traces/metrics can never disagree on which service produced them. Unset in appsettings.json
+// on purpose — TelemetryExtensions derives both from this assembly by default; see its remarks.
+string telemetryServiceName = TelemetryExtensions.ResolveServiceName(telemetry);
+string? telemetryServiceVersion = TelemetryExtensions.ResolveServiceVersion(telemetry);
 
 // Global exception handling → RFC 9457 ProblemDetails (see GlobalExceptionHandler).
 builder.Services.AddGlobalExceptionHandler();
@@ -103,10 +104,14 @@ builder.Services.AddSerilog((services, configuration) =>
     {
         configuration.WriteTo.OpenTelemetry(options =>
         {
-            // Without this, logs report as "unknown_service:AspNetDesignPatterns.Api" instead
-            // of matching the clean service name ConfigureResource(...) gives the traces/metrics
-            // exported by AddAppTelemetry() below — this sink has its own, separate resource.
-            options.ResourceAttributes["service.name"] = SERVICE_NAME;
+            // Without this, logs report as "unknown_service:<name>" instead of matching the
+            // clean service name ConfigureResource(...) gives the traces/metrics exported by
+            // AddAppTelemetry() below — this sink has its own, separate resource.
+            options.ResourceAttributes["service.name"] = telemetryServiceName;
+            if (telemetryServiceVersion is not null)
+            {
+                options.ResourceAttributes["service.version"] = telemetryServiceVersion;
+            }
 
             if (telemetry.OtlpEndpoint is not null)
             {
@@ -150,9 +155,9 @@ builder.Services.AddPolicyDrivenAuthorization();
 builder.Services.AddHttpContextAccessor();
 
 // Traces (ASP.NET Core + HttpClient + one span per Pipeline<TContext> step) and metrics
-// (+ .NET runtime counters), exported via OTLP alongside the Serilog sink above. This app's
-// own name is passed in — KAM.Common has no identity of its own to report as the service.
-builder.Services.AddAppTelemetry(SERVICE_NAME, telemetry);
+// (+ .NET runtime counters), exported via OTLP alongside the Serilog sink above. Resolves the
+// same service name/version as telemetryServiceName/telemetryServiceVersion above internally.
+builder.Services.AddAppTelemetry(telemetry);
 
 // Health-check services. Individual checks self-register from the slice that owns them
 // (e.g. Features/Weather/WeatherDependencies); the two probes are mapped by MapAppHealthChecks().

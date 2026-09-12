@@ -17,7 +17,7 @@ public class TelemetryExtensionsTests
         ServiceCollection services = new();
 
         // Act
-        services.AddAppTelemetry("test-service", new TelemetrySettings { Enabled = true });
+        services.AddAppTelemetry(new TelemetrySettings { Enabled = true });
         using ServiceProvider provider = services.BuildServiceProvider();
 
         // Assert
@@ -37,7 +37,7 @@ public class TelemetryExtensionsTests
         ServiceCollection services = new();
 
         // Act
-        services.AddAppTelemetry("test-service", new TelemetrySettings { Enabled = false });
+        services.AddAppTelemetry(new TelemetrySettings { Enabled = false });
         using ServiceProvider provider = services.BuildServiceProvider();
 
         // Assert
@@ -46,5 +46,32 @@ public class TelemetryExtensionsTests
             provider.GetService<TracerProvider>().Should().BeNull();
             provider.GetService<MeterProvider>().Should().BeNull();
         }
+    }
+
+    [Test]
+    public void ResolveServiceName_prefers_the_configured_value_over_the_entry_assembly()
+    {
+        // Arrange & Act & Assert
+        TelemetryExtensions.ResolveServiceName(new TelemetrySettings { ServiceName = "custom-service" })
+            .Should().Be("custom-service");
+    }
+
+    [Test]
+    public void ResolveServiceName_falls_back_to_the_entry_assembly_when_unconfigured()
+    {
+        // Arrange & Act
+        string resolved = TelemetryExtensions.ResolveServiceName(new TelemetrySettings());
+
+        // Assert — under the test runner, the entry assembly is the test host, not KAM.Common;
+        // the point is that *some* non-empty name is derived, not a specific one.
+        resolved.Should().NotBeNullOrEmpty();
+    }
+
+    [Test]
+    public void ResolveServiceVersion_prefers_the_configured_value_over_the_entry_assembly()
+    {
+        // Arrange & Act & Assert
+        TelemetryExtensions.ResolveServiceVersion(new TelemetrySettings { ServiceVersion = "9.9.9" })
+            .Should().Be("9.9.9");
     }
 }
