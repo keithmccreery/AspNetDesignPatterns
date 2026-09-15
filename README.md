@@ -43,6 +43,17 @@ Then:
 `GET /api/v1/weather/forecast` proxies the public [open-meteo](https://open-meteo.com) API,
 so it needs outbound network access; the tests do not.
 
+**Or use the `.http` file**: [`AspNetDesignPatterns.Api.http`](src/AspNetDesignPatterns.Api/AspNetDesignPatterns.Api.http)
+has all of the above as ready-to-run requests (Visual Studio, VS Code + REST Client, and Rider
+all support `.http` files natively) — the token request is named so the forecast request can
+reuse its response directly, no copy-pasting a bearer token by hand.
+[`http-client.env.json`](src/AspNetDesignPatterns.Api/http-client.env.json) switches the
+target host between `Local` and `Azure` (once deployed — see the Versioning + CI pattern row
+below); your editor's environment picker selects which one a request runs against. The
+dev-token request only succeeds against a host running in the Development environment, by
+design (`DevTokenEndpoint` is Development-only), so it'll 404 against an `Azure` host running
+as anything else.
+
 **Optional — view traces/logs/metrics**: `docker compose up -d` runs a local .NET Aspire
 Dashboard at <http://localhost:18888>; the app's OTLP export already points at it by default.
 Skip this step entirely and the app runs identically — see [`Telemetry/`](src/KAM.Common/Telemetry).
@@ -96,6 +107,7 @@ src/AspNetDesignPatterns.Api/          the host — depends on the project below
   Program.cs                 banner-organized composition root: .env, ProblemDetails, JSON,
                              Serilog, versioning + OpenAPI, auth, then the reflection scans
   GlobalUsings.cs
+  AspNetDesignPatterns.Api.http / http-client.env.json   ready-to-run requests, Local/Azure envs
   Features/                  one folder per vertical slice (endpoint + handler + service + …)
     Weather/                 see Features/Weather/README.md
 src/KAM.Common/             reusable, no reference to the project above — see its own README

@@ -32,6 +32,17 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          # Central Package Management pins every version in Directory.Packages.props, so
+          # hashing it (plus every .csproj, which catches a new PackageReference line even
+          # before its version changes) is enough to invalidate on any dependency change.
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
       - name: Build (Debug)
         run: dotnet build "$SOLUTION_PATH" --configuration Debug
 
@@ -59,6 +70,14 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
 
       - name: Restore local tools (nbgv)
         run: dotnet tool restore

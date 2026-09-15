@@ -1,0 +1,31 @@
+@HostAddress = {{HostAddress}}
+
+### Liveness probe -- always 200, runs no checks (see HealthChecks/README.md)
+GET {{HostAddress}}/health/live
+
+### Readiness probe -- runs `ready`-tagged checks, cached 15s
+GET {{HostAddress}}/health/ready
+
+### OpenAPI document -- Production-gated (see OpenApi/OpenApiExtensions.cs), 404s there
+GET {{HostAddress}}/openapi/v1.json
+
+### Mint a development JWT -- Development environment only (see DevTokenEndpoint.cs);
+### the "token" name below lets the forecast request reuse its response without copy-pasting.
+# @name token
+POST {{HostAddress}}/api/v1/auth/token
+Content-Type: application/json
+
+{
+  "subject": "me"
+}
+
+### Weather forecast, authenticated with the token minted above
+GET {{HostAddress}}/api/v1/weather/forecast?latitude=52.52&longitude=13.40&days=3
+Authorization: Bearer {{token.response.body.$.accessToken}}
+
+### Weather forecast without a token -- expect 401 ProblemDetails
+GET {{HostAddress}}/api/v1/weather/forecast?latitude=52.52&longitude=13.40&days=3
+
+### Weather forecast with an invalid query param -- expect 400 ProblemDetails (FluentValidation)
+GET {{HostAddress}}/api/v1/weather/forecast?latitude=999&longitude=13.40&days=3
+Authorization: Bearer {{token.response.body.$.accessToken}}
