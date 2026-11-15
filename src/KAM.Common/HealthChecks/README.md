@@ -15,7 +15,7 @@ Both are **anonymous**, both are **hidden from the OpenAPI document**, both sit 
 | File | Type | Purpose |
 |---|---|---|
 | `HealthCheckTag.cs` | `static class` | `HealthCheckTag.Ready` — the tag `/health/ready` filters on. No `Live` equivalent: liveness runs zero checks, so nothing would ever read it. |
-| `HealthCheckResponseWriter.cs` | `static` writer | Serializes a `HealthReport` to `{ status, totalDurationMs, entries: { name: { status, durationMs, description, error, tags } } }` using the app's shared `JsonSerializerOptions`. `description`/`error` (exception **message**, never a stack trace) are included only outside Production — both routes are anonymous, so a hand-written check `Description` or an `Exception.Message` (hostname, port, connection-string fragment) must not reach an unauthenticated caller in Production. |
+| `HealthCheckResponseWriter.cs` | `static` writer | Serializes a `HealthReport` to `{ status, totalDurationMs, entries: { name: { status, durationMs, description, error, tags } } }` using the app's shared `JsonSerializerOptions`. `description`/`error` (exception **message**, never a stack trace) are included only when `MapAppHealthChecks(includeDetails: …)` says so — the app passes `!app.Environment.IsProduction()`, so the policy lives in `Program.cs`, not in this writer. Both routes are anonymous, so a hand-written check `Description` or an `Exception.Message` (hostname, port, connection-string fragment) must not reach an unauthenticated caller in Production. |
 | `HealthCheckExtensions.cs` | `MapAppHealthChecks()` | Maps the two routes with the tag predicates and the response writer. |
 
 ## Wiring
@@ -25,7 +25,7 @@ Both are **anonymous**, both are **hidden from the OpenAPI document**, both sit 
 builder.Services.AddHealthChecks();
 
 // Program.cs — endpoints
-app.MapAppHealthChecks();
+app.MapAppHealthChecks(includeDetails: !app.Environment.IsProduction());
 ```
 
 Individual checks self-register from the slice that owns them — they are **not** listed in a
@@ -64,8 +64,8 @@ services.AddHealthChecks().AddCheck<WeatherProviderHealthCheck>(
 ## Tests
 
 - `tests/KAM.Common.Tests/HealthChecks/HealthCheckResponseWriterTests.cs` — the JSON shape from a
-  synthetic `HealthReport`, and that `description`/`error` are present outside Production and
-  omitted in Production.
+  synthetic `HealthReport`, and that `description`/`error` are present with `includeDetails: true`
+  and omitted with `false`.
 - `tests/…/Features/Weather/WeatherProviderHealthCheckTests.cs` — Healthy on 2xx, Degraded on
   an error status or an unreachable host (fake `HttpMessageHandler`), and that a second probe
   within the cache window doesn't call the provider again.

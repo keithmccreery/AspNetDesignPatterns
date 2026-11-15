@@ -196,7 +196,8 @@ app.UseAuthorization();
 app.MapApiReference(title: "AspNetDesignPatterns API", theme: "Mars");
 
 // Liveness + readiness probes at /health/live and /health/ready (root, unversioned, anonymous).
-app.MapAppHealthChecks();
+// Check descriptions/exception messages are omitted in Production: the probes are anonymous.
+app.MapAppHealthChecks(includeDetails: !app.Environment.IsProduction());
 
 // All feature endpoints live under the versioned group: /api/v1/...
 ApiVersionSet apiVersionSet = app

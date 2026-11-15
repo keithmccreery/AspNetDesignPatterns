@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace KAM.Common.HealthChecks;
 
@@ -14,15 +15,25 @@ public static class HealthCheckExtensions
     /// Adds <c>/health/live</c> and <c>/health/ready</c>. Both are anonymous, both are hidden
     /// from the OpenAPI document, and both render through <see cref="HealthCheckResponseWriter"/>.
     /// </summary>
-    public static WebApplication MapAppHealthChecks(this WebApplication app)
+    /// <param name="app">The application to map the probes onto.</param>
+    /// <param name="includeDetails">
+    /// Whether each entry's description and exception message are written. Required, not
+    /// defaulted: the routes are anonymous and <c>Exception.Message</c> can leak a hostname or
+    /// connection-string fragment, so the caller states the policy (typically
+    /// <c>!app.Environment.IsProduction()</c>).
+    /// </param>
+    public static WebApplication MapAppHealthChecks(this WebApplication app, bool includeDetails)
     {
+        Task WriteResponseAsync(HttpContext context, HealthReport report) =>
+            HealthCheckResponseWriter.WriteAsync(context, report, includeDetails);
+
         // Liveness: run NO checks. A 200 just means the process is responsive and its request
         // pipeline is not wedged. Dependency health is deliberately out of scope here — a
         // downstream outage must not make the orchestrator kill and restart the pod.
         app.MapHealthChecks("/health/live", new HealthCheckOptions
         {
             Predicate = _ => false,
-            ResponseWriter = HealthCheckResponseWriter.WriteAsync,
+            ResponseWriter = WriteResponseAsync,
         })
         .WithName("HealthLive")
         .AllowAnonymous()
@@ -33,7 +44,7 @@ public static class HealthCheckExtensions
         app.MapHealthChecks("/health/ready", new HealthCheckOptions
         {
             Predicate = registration => registration.Tags.Contains(HealthCheckTag.Ready),
-            ResponseWriter = HealthCheckResponseWriter.WriteAsync,
+            ResponseWriter = WriteResponseAsync,
         })
         .WithName("HealthReady")
         .AllowAnonymous()
