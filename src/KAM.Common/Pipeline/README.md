@@ -70,6 +70,14 @@ internal sealed class GetForecastHandler(IPipelineFactory factory) : IRequestHan
   from the active request scope, so a step can safely depend on scoped services
   (`DbContext`, request-scoped state).
 - Ordering is the order of `.Use<>()` calls, not an attribute.
+- `Build()` returns an **immutable snapshot** — `Use<>()` on the builder afterwards only affects
+  pipelines built later.
+- Each step's `next` is bound to that step's position: calling it twice (a retry step) runs the
+  rest of the chain twice, it never skips steps.
+- **Spans:** each step gets one. A failed `Result` sets `ActivityStatusCode.Error` + an
+  `error.type` tag (the error code) **only on the step it originated in**; steps that just pass
+  the same failure along stay `Unset`. An exception is recorded (`AddException`) once, on the
+  step that threw. So a trace points at where things went wrong, not at every enclosing step.
 
 ## Tests
 

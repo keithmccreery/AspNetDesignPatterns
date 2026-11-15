@@ -11,47 +11,102 @@ namespace KAM.Common.Pipeline;
 /// <see cref="Result"/> or does not call <c>next</c>. Each step runs inside its own span (see
 /// <see cref="ActivitySources.Pipeline"/>) — free when nothing's listening for it.
 /// </summary>
-public sealed class Pipeline<TContext>(IServiceProvider serviceProvider)
+/// <remarks>
+/// <para>
+/// Immutable: the step list is a snapshot taken by <see cref="IPipelineBuilder{TContext}.Build"/>,
+/// so adding steps to the builder afterwards can't change a pipeline already handed out.
+/// </para>
+/// <para>
+/// Each step's <c>next</c> is bound to that step's own position, so calling it twice runs the
+/// rest of the chain twice (e.g. a retry step) instead of silently skipping steps.
+/// </para>
+/// <para>
+/// A failed <see cref="Result"/> (or an exception) marks <em>only the span of the step it came
+/// from</em> with <see cref="ActivityStatusCode.Error"/> and an <c>error.type</c> tag. Outer steps
+/// that merely pass that same failure along keep an unset status, so a trace shows where the
+/// failure originated rather than painting every enclosing span red.
+/// </para>
+/// </remarks>
+public sealed class Pipeline<TContext>
 {
-    private readonly IServiceProvider _serviceProvider =
-        serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+    private readonly IServiceProvider _serviceProvider;
+    private readonly IReadOnlyList<Type> _stepTypes;
 
-    private readonly List<Type> _stepTypes = [];
-
-    /// <summary>
-    /// Appends a step type to the chain. Resolved from DI when the pipeline runs. Internal:
-    /// composing a pipeline goes through <see cref="IPipelineBuilder{TContext}"/> so that once
-    /// <see cref="IPipelineBuilder{TContext}.Build"/> has handed out this instance, its chain
-    /// is fixed — a caller holding the built <see cref="Pipeline{TContext}"/> cannot mutate it.
-    /// </summary>
-    internal Pipeline<TContext> Use<TStep>()
-        where TStep : class, IPipelineStep<TContext>
+    internal Pipeline(IServiceProvider serviceProvider, IReadOnlyList<Type> stepTypes)
     {
-        _stepTypes.Add(typeof(TStep));
-        return this;
+        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        _stepTypes = stepTypes ?? throw new ArgumentNullException(nameof(stepTypes));
     }
 
     /// <summary>Runs the chain. Returns the first failure, or success if every step calls through.</summary>
-    public Task<Result> ExecuteAsync(TContext context, CancellationToken cancellationToken = default)
+    public Task<Result> ExecuteAsync(TContext context, CancellationToken cancellationToken = default) =>
+        InvokeAsync(0, context, cancellationToken);
+
+    private async Task<Result> InvokeAsync(int index, TContext context, CancellationToken cancellationToken)
     {
-        int index = 0;
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (index >= _stepTypes.Count)
+        {
+            return Result.Success();
+        }
+
+        Type stepType = _stepTypes[index];
+        IPipelineStep<TContext> step = (IPipelineStep<TContext>) _serviceProvider.GetRequiredService(stepType);
+
+        using Activity? activity = ActivitySources.Pipeline.StartActivity(stepType.Name);
+
+        // What the rest of the chain produced, so this step's span can tell a failure it
+        // originated from one it is only passing along.
+        Error? errorFromNext = null;
+        bool nextThrew = false;
 
         async Task<Result> NextAsync(CancellationToken token)
         {
-            token.ThrowIfCancellationRequested();
-
-            if (index >= _stepTypes.Count)
+            try
             {
-                return Result.Success();
+                Result inner = await InvokeAsync(index + 1, context, token);
+                errorFromNext = inner.IsFailure ? inner.Error : null;
+                return inner;
             }
-
-            Type stepType = _stepTypes[index++];
-            IPipelineStep<TContext> step = (IPipelineStep<TContext>) _serviceProvider.GetRequiredService(stepType);
-
-            using Activity? activity = ActivitySources.Pipeline.StartActivity(stepType.Name);
-            return await step.ExecuteAsync(context, NextAsync, token);
+            catch
+            {
+                nextThrew = true;
+                throw;
+            }
         }
 
-        return NextAsync(cancellationToken);
+        try
+        {
+            Result result = await step.ExecuteAsync(context, NextAsync, cancellationToken);
+
+            if (result.IsFailure && !Equals(result.Error, errorFromNext))
+            {
+                activity?.SetStatus(ActivityStatusCode.Error, result.Error.Code);
+                activity?.SetTag("error.type", result.Error.Code);
+            }
+
+            return result;
+        }
+        catch (Exception ex) when (RecordException(activity, ex, nextThrew))
+        {
+            // Unreachable: the filter always returns false, so the exception propagates
+            // untouched (no catch/rethrow) after being recorded on this step's span.
+            throw;
+        }
+    }
+
+    private static bool RecordException(Activity? activity, Exception exception, bool thrownDeeper)
+    {
+        // Cancellation isn't a failure of this step, and an exception from deeper in the chain
+        // was already recorded on the span of the step that threw it.
+        if (activity is not null && !thrownDeeper && exception is not OperationCanceledException)
+        {
+            activity.AddException(exception);
+            activity.SetStatus(ActivityStatusCode.Error, exception.Message);
+            activity.SetTag("error.type", exception.GetType().FullName);
+        }
+
+        return false;
     }
 }
