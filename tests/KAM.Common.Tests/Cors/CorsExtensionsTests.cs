@@ -81,6 +81,53 @@ public class CorsExtensionsTests
     }
 
     [Test]
+    public void Configured_methods_and_headers_replace_the_defaults_rather_than_adding_to_them()
+    {
+        // Arrange — through the real config-binding path, not a hand-built CorsSettings. The
+        // configuration binder *appends* to a collection property that already has items, so
+        // a non-empty initializer default could never be narrowed from appsettings.json.
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                ["Cors:AllowedOrigins:0"] = "https://app.example.com",
+                ["Cors:AllowedHeaders:0"] = "authorization",
+                ["Cors:AllowedMethods:0"] = "GET",
+            })
+            .Build();
+
+        ServiceCollection services = new();
+        services.AddSingleton(configuration);
+        services.AddSettings(typeof(CorsSettings).Assembly);
+        services.AddCorsPolicy();
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        // Act
+        CorsPolicy policy = provider.GetRequiredService<IOptions<CorsOptions>>().Value.GetPolicy(CorsExtensions.PolicyName)!;
+
+        // Assert
+        using (new AssertionScope())
+        {
+            policy.AllowAnyHeader.Should().BeFalse();
+            policy.Headers.Should().Equal("authorization");
+            policy.Methods.Should().Equal("GET");
+        }
+    }
+
+    [Test]
+    public void Defaults_to_any_header_and_the_common_methods_when_none_are_configured()
+    {
+        // Arrange & Act
+        CorsPolicy policy = BuildPolicy(new CorsSettings { AllowedOrigins = ["https://app.example.com"] });
+
+        // Assert
+        using (new AssertionScope())
+        {
+            policy.AllowAnyHeader.Should().BeTrue();
+            policy.Methods.Should().Equal(CorsSettings.DefaultAllowedMethods);
+        }
+    }
+
+    [Test]
     public void Applies_credentials_and_preflight_max_age()
     {
         // Arrange & Act

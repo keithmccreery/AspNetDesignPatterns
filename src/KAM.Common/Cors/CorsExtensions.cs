@@ -12,7 +12,9 @@ public static class CorsExtensions
     /// <summary>
     /// Registers the <see cref="PolicyName"/> CORS policy, configured lazily from
     /// <see cref="CorsSettings"/> so options validation (<c>ValidateOnStart</c>) still governs
-    /// whether the app is allowed to start. <c>"*"</c> in <see cref="CorsSettings.AllowedHeaders"/>
+    /// whether the app is allowed to start. An empty <see cref="CorsSettings.AllowedHeaders"/> /
+    /// <see cref="CorsSettings.AllowedMethods"/> means "not configured" and gets the default
+    /// (any header / <see cref="CorsSettings.DefaultAllowedMethods"/>). <c>"*"</c> in <see cref="CorsSettings.AllowedHeaders"/>
     /// or <see cref="CorsSettings.AllowedMethods"/> means "any" (<c>AllowAnyHeader()</c> /
     /// <c>AllowAnyMethod()</c>) — <c>WithHeaders("*")</c>/<c>WithMethods("*")</c> would instead
     /// treat <c>"*"</c> as a literal header/method name, which is not what a config author means.
@@ -37,7 +39,8 @@ public static class CorsExtensions
                         policy.WithOrigins([.. settings.AllowedOrigins]);
                     }
 
-                    if (settings.AllowedHeaders.Contains("*"))
+                    // Empty = not configured; see CorsSettings for why the defaults live here.
+                    if (settings.AllowedHeaders.Count == 0 || settings.AllowedHeaders.Contains("*"))
                     {
                         policy.AllowAnyHeader();
                     }
@@ -46,13 +49,17 @@ public static class CorsExtensions
                         policy.WithHeaders([.. settings.AllowedHeaders]);
                     }
 
-                    if (settings.AllowedMethods.Contains("*"))
+                    IReadOnlyList<string> methods = settings.AllowedMethods.Count > 0
+                        ? settings.AllowedMethods
+                        : CorsSettings.DefaultAllowedMethods;
+
+                    if (methods.Contains("*", StringComparer.Ordinal))
                     {
                         policy.AllowAnyMethod();
                     }
                     else
                     {
-                        policy.WithMethods([.. settings.AllowedMethods]);
+                        policy.WithMethods([.. methods]);
                     }
 
                     policy.SetPreflightMaxAge(TimeSpan.FromSeconds(settings.MaxAgeSeconds));

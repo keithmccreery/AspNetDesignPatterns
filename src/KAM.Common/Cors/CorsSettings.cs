@@ -24,11 +24,22 @@ public sealed class CorsSettings : SettingsBase<CorsSettings>
     [Required]
     public List<string> AllowedOrigins { get; init; } = [];
 
-    /// <summary>Request headers allowed. <c>["*"]</c> (the default) means any header.</summary>
-    public List<string> AllowedHeaders { get; init; } = ["*"];
+    // AllowedHeaders/AllowedMethods default to EMPTY, with the real defaults applied by
+    // CorsExtensions when nothing is configured. The configuration binder *appends* to a
+    // collection that already has items, so a non-empty initializer (e.g. ["*"]) could never
+    // be narrowed from appsettings.json -- ["GET"] would bind as the defaults plus "GET".
 
-    /// <summary>HTTP methods allowed. <c>["*"]</c> means any method.</summary>
-    public List<string> AllowedMethods { get; init; } = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"];
+    /// <summary>Request headers allowed. Empty (the default) or <c>["*"]</c> means any header.</summary>
+    public List<string> AllowedHeaders { get; init; } = [];
+
+    /// <summary>
+    /// HTTP methods allowed. Empty (the default) means <see cref="DefaultAllowedMethods"/>;
+    /// <c>["*"]</c> means any method.
+    /// </summary>
+    public List<string> AllowedMethods { get; init; } = [];
+
+    /// <summary>The methods allowed when <see cref="AllowedMethods"/> is not configured.</summary>
+    public static IReadOnlyList<string> DefaultAllowedMethods { get; } = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"];
 
     /// <summary>Whether to allow cookies/credentials on cross-origin requests. Incompatible with a <c>"*"</c> origin — see <see cref="CorsSettingsValidator"/>.</summary>
     public bool AllowCredentials { get; init; } = true;
