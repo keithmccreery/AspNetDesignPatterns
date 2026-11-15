@@ -1,6 +1,8 @@
 using AspNetDesignPatterns.Api.Features.Weather;
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http.Resilience;
+using Microsoft.Extensions.Options;
 
 namespace AspNetDesignPatterns.Api.Tests.Features.Weather;
 
@@ -8,7 +10,7 @@ namespace AspNetDesignPatterns.Api.Tests.Features.Weather;
 /// <see cref="WeatherDependencies"/>'s <c>AddHttpClient&lt;IWeatherClient, OpenMeteoWeatherClient&gt;</c>
 /// configuration delegate never runs under any other test — <c>WeatherApiFactory</c> substitutes
 /// <see cref="IWeatherClient"/> outright, so nothing else proves <c>BaseAddress</c>/<c>Timeout</c>
-/// are actually wired from <see cref="WeatherOptions"/>.
+/// are actually wired from <see cref="WeatherOptions"/>, nor that the resilience timeouts are.
 /// </summary>
 [TestFixture]
 public class WeatherDependenciesTests
@@ -22,7 +24,8 @@ public class WeatherDependenciesTests
         services.AddSingleton(Microsoft.Extensions.Options.Options.Create(new WeatherOptions
         {
             BaseAddress = "https://weather.test",
-            RequestTimeout = TimeSpan.FromSeconds(7),
+            AttemptTimeout = TimeSpan.FromSeconds(20),
+            TotalRequestTimeout = TimeSpan.FromSeconds(50),
         }));
 
         new WeatherDependencies().RegisterServices(services);
@@ -38,7 +41,37 @@ public class WeatherDependenciesTests
         using (new AssertionScope())
         {
             client.BaseAddress.Should().Be(new Uri("https://weather.test"));
-            client.Timeout.Should().Be(TimeSpan.FromSeconds(7));
+            client.Timeout.Should().Be(Timeout.InfiniteTimeSpan, "Polly owns timing; a finite HttpClient.Timeout would cut retries short");
+        }
+    }
+
+    [Test]
+    public void RegisterServices_drives_the_resilience_timeouts_from_WeatherOptions()
+    {
+        // Arrange
+        ServiceCollection services = new();
+        services.AddLogging();
+        services.AddSingleton(Microsoft.Extensions.Options.Options.Create(new WeatherOptions
+        {
+            AttemptTimeout = TimeSpan.FromSeconds(20),
+            TotalRequestTimeout = TimeSpan.FromSeconds(50),
+        }));
+
+        new WeatherDependencies().RegisterServices(services);
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        // Act — the standard handler's options are named "<client name>-standard".
+        HttpStandardResilienceOptions resilience = provider
+            .GetRequiredService<IOptionsMonitor<HttpStandardResilienceOptions>>()
+            .Get($"{nameof(IWeatherClient)}-standard");
+
+        // Assert
+        using (new AssertionScope())
+        {
+            resilience.AttemptTimeout.Timeout.Should().Be(TimeSpan.FromSeconds(20));
+            resilience.TotalRequestTimeout.Timeout.Should().Be(TimeSpan.FromSeconds(50));
+            resilience.CircuitBreaker.SamplingDuration.Should().Be(TimeSpan.FromSeconds(40), "Polly requires at least 2 x the attempt timeout");
         }
     }
 }

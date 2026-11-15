@@ -19,8 +19,11 @@ public sealed class WeatherOptions : SettingsBase<WeatherOptions>
     /// <summary>Base address of the open-meteo forecast API.</summary>
     public string BaseAddress { get; init; } = "https://api.open-meteo.com";
 
-    /// <summary>Per-request timeout for the typed <see cref="HttpClient"/>.</summary>
-    public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(10);
+    /// <summary>Timeout for a single attempt (Polly's per-attempt timeout); a timed-out attempt is retried.</summary>
+    public TimeSpan AttemptTimeout { get; init; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>Timeout for the whole call, every retry included (Polly's total request timeout).</summary>
+    public TimeSpan TotalRequestTimeout { get; init; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
     /// Upper bound on the forecast window a caller may request — enforced by
@@ -38,9 +41,14 @@ internal sealed class WeatherOptionsValidator : AbstractValidator<WeatherOptions
             .Must(uri => Uri.TryCreate(uri, UriKind.Absolute, out _))
             .WithMessage("BaseAddress must be an absolute URI.");
 
-        RuleFor(x => x.RequestTimeout)
+        RuleFor(x => x.AttemptTimeout)
             .GreaterThan(TimeSpan.Zero)
             .LessThanOrEqualTo(TimeSpan.FromSeconds(30));
+
+        // A total no longer than one attempt would leave no time for a retry.
+        RuleFor(x => x.TotalRequestTimeout)
+            .GreaterThan(x => x.AttemptTimeout)
+            .LessThanOrEqualTo(TimeSpan.FromMinutes(2));
 
         // 16 is open-meteo's own maximum: config may narrow the window, never widen it past that.
         RuleFor(x => x.MaxForecastDays).InclusiveBetween(1, 16);

@@ -76,13 +76,16 @@ Anything thrown and not caught (a bug, not an expected failure) is caught by
 // appsettings.json
 "Weather": {
   "BaseAddress": "https://api.open-meteo.com",
-  "RequestTimeout": "00:00:10",
+  "AttemptTimeout": "00:00:10",      // Polly per-attempt timeout (retried)
+  "TotalRequestTimeout": "00:00:30", // Polly total timeout, retries included
   "MaxForecastDays": 16
 }
 ```
 
 Validated on startup by `WeatherOptionsValidator` (FluentValidation, because a validator is
-registered). Set `MaxForecastDays` to `999` and the app fails fast with a clear message —
+registered). `HttpClient.Timeout` is deliberately infinite: it wraps the whole handler chain,
+retries included, so a finite value races Polly — Polly's two timeouts above are the only
+clock. Set `MaxForecastDays` to `999` and the app fails fast with a clear message —
 that is the settings-validation pattern working. Set it to `7` and requests for more than 7
 days get a 400 from `GetForecastRequestValidator`, which reads the same value — the request
 rule and the config can't drift apart.
