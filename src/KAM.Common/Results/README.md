@@ -108,9 +108,30 @@ public async Task<Result<Receipt>> CheckoutAsync(CheckoutRequest request, Cancel
 
 // endpoint
 return await _handler.HandleAsync(request, ct)
-    .LogOnFailureAsync(logger)      // logs Error.Exception + Error.Context if present
+    .LogOnFailureAsync(logger)      // one event: Error.Exception + Error.Context, level by ErrorType
     .ToHttpResultAsync();           // 200 / 400 / 402 / 502 ProblemDetails
 ```
+
+## Logging a failure: `LogOnFailure`
+
+The endpoint's `LogOnFailure(logger)` is the **one place** a failed `Result` gets logged — the
+last resort for every expected failure, since services take no `ILogger` and attach the
+exception/context to the `Error` instead. So it logs **every** failure — nothing is skipped
+because a feature didn't think to handle it — and the level says whose problem it is:
+
+| `ErrorType` | Level | Why |
+|---|---|---|
+| `Upstream`, `Failure` (and any future type) | `Error` | ours — an outage or a bug; alert on these |
+| `Unauthorized`, `Forbidden`, `Conflict` | `Warning` | not a fault, but a spike is a signal (credential stuffing, a broken client, a race) |
+| `Validation`, `NotFound` | `Information` | the caller's mistake; routine, and at `Error` would drown real errors |
+
+It's one event, with `Error.Context` destructured into it (`{@Context}`), so filtering a log
+store on `ErrorCode` finds the context too. `ErrorType.ToLogLevel()` is public if another
+boundary needs the same mapping.
+
+Note that 401/403 from the **authentication/authorization middleware** never reach a handler or
+`LogOnFailure` at all — they're logged by `AddJwtAuth()`'s `JwtBearerEvents` (failed tokens at
+`Warning`) and ASP.NET Core's own authorization logging.
 
 ## `ResultUtilities` — aggregating several results
 
