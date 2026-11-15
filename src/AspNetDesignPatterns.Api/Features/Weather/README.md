@@ -112,3 +112,16 @@ rule and the config can't drift apart.
 4. If it reads configuration, add a `SettingsBase<T>` class (and a validator if you want
    FluentValidation rather than DataAnnotations).
 5. That's it — reflection registers all of the above; no central file to edit.
+
+### Not every slice needs every layer
+
+This slice is deliberately maximal — it exists to show every pattern once, and the repo will
+keep adding more. A real slice should take only the layers it needs:
+
+- **No pipeline** unless there are genuinely composable steps (gates, enrichment,
+  post-processing) — a handler can call the service directly and return its `Result<T>`.
+- **No separate service** when there's no client exception to translate or upstream shape to
+  map — the handler can own that logic.
+- The endpoint → handler → `Result` → `ToHttpResult()` spine and the "only clients throw"
+  rule are the parts that *aren't* optional.
+
