@@ -52,8 +52,11 @@ services.AddHealthChecks().AddCheck<WeatherProviderHealthCheck>(
   credentials, so without a cache every request to it would drive one outbound call to
   open-meteo. `WeatherProviderHealthCheck` caches its result for 15s via `IMemoryCache`
   (`builder.Services.AddMemoryCache()` in `Program.cs`) — cheap insurance, and readiness
-  doesn't need fresher-than-a-few-seconds data anyway. A check with no external call (most of
-  them) doesn't need this.
+  doesn't need fresher-than-a-few-seconds data anyway. `IMemoryCache.GetOrCreateAsync` takes
+  no lock, so a burst arriving as the entry expires can still fire a handful of concurrent
+  probes (once per window, bounded by the burst); `HybridCache` is the framework option if
+  that ever needs to be exactly one. A check with no external call (most of them) doesn't
+  need this.
 - **No third-party UI package.** `HealthCheckResponseWriter` is ~40 lines and gives full
   control of the shape; `AspNetCore.HealthChecks.UI.Client` would be the drop-in alternative
   if a dashboard needs its exact schema.

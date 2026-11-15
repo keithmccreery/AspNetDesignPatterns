@@ -95,9 +95,11 @@ public class WeatherProviderHealthCheckTests
     [Test]
     public async Task Concurrent_probes_racing_the_cache_share_a_single_outbound_call()
     {
-        // Arrange — GetOrCreateAsync holds a per-key lock across the factory; a bare
-        // TryGetValue + Set pair would let a burst of requests each miss the cache and fire
-        // their own concurrent probe instead of sharing one.
+        // Arrange — NB this passes only because StubHttpMessageHandler completes
+        // synchronously: the first factory call populates the cache before the next caller
+        // starts. IMemoryCache.GetOrCreateAsync takes no lock, so against a real (truly async)
+        // HttpClient concurrent misses would each probe. It guards the cache wiring, not
+        // stampede protection — see the comment in WeatherProviderHealthCheck.
         StubHttpMessageHandler handler = new(HttpStatusCode.OK);
         IMemoryCache cache = new MemoryCache(new MemoryCacheOptions());
         WeatherProviderHealthCheck check = CreateCheck(handler, cache);

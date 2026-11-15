@@ -30,9 +30,11 @@ internal sealed class WeatherProviderHealthCheck(HttpClient httpClient, IMemoryC
         CancellationToken cancellationToken = default) =>
         cache.GetOrCreateAsync(CACHE_KEY, async entry =>
         {
-            // GetOrCreateAsync holds a per-key lock across the factory, unlike a bare
-            // TryGetValue + Set pair — a burst of requests landing as the TTL expires shares
-            // one probe instead of each firing its own concurrent outbound call.
+            // Note: IMemoryCache.GetOrCreateAsync takes NO lock. Concurrent misses each run
+            // this factory, so a burst landing as the TTL expires can still fire several probes
+            // at once (bounded by the burst, and only once per window). If that ever matters,
+            // HybridCache.GetOrCreateAsync is the framework type that coalesces concurrent
+            // misses into one factory call.
             entry.AbsoluteExpirationRelativeToNow = CacheDuration;
             return await ProbeAsync(cancellationToken);
         });
