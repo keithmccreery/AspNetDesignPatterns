@@ -61,8 +61,10 @@ string? telemetryServiceVersion = TelemetryExtensions.ResolveServiceVersion(tele
 builder.Services.AddGlobalExceptionHandler();
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
 {
+    // RFC 9457: "instance" is a URI reference identifying this occurrence -- the request path
+    // (PathBase included, so it's right behind a path-prefixing proxy), not "GET /path".
     context.ProblemDetails.Instance ??=
-        $"{context.HttpContext.Request.Method} {context.HttpContext.Request.Path}";
+        $"{context.HttpContext.Request.PathBase}{context.HttpContext.Request.Path}";
     context.ProblemDetails.Extensions["traceId"] =
         System.Diagnostics.Activity.Current?.Id ?? context.HttpContext.TraceIdentifier;
 });

@@ -82,7 +82,11 @@ public class WeatherEndpointTests
         ProblemDetails? problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadGateway);
-        problem!.Extensions.Should().ContainKey("errorCode");
+        using (new AssertionScope())
+        {
+            response.StatusCode.Should().Be(HttpStatusCode.BadGateway);
+            problem!.Extensions.Should().ContainKey("errorCode").And.ContainKey("traceId");
+            problem.Instance.Should().Be("/api/v1/weather/forecast", "RFC 9457: a URI reference, not \"GET /path\"");
+        }
     }
 }
