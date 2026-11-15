@@ -18,6 +18,7 @@ public class DevTokenIssuerTests
         Issuer = "https://tests/issuer",
         Audience = "tests-audience",
         AccessTokenMinutes = 30,
+        DevTokenScopes = ["weather:read", "weather:write"],
     };
 
     private static DevTokenIssuer CreateIssuer(TimeProvider? time = null) =>
@@ -49,7 +50,7 @@ public class DevTokenIssuerTests
             validation.IsValid.Should().BeTrue();
             validation.Claims.Should().ContainKey("sub").WhoseValue.Should().Be("alice");
             validation.ClaimsIdentity.Name.Should().Be("alice");
-            validation.Claims.Should().ContainKey("scope").WhoseValue.Should().Be("weather:read");
+            validation.Claims.Should().ContainKey("scope").WhoseValue.Should().Be("weather:read weather:write");
         }
     }
 

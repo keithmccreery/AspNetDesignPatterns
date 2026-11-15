@@ -74,8 +74,10 @@ Optional: `docker compose up -d` runs a local OTLP collector (.NET Aspire Dashbo
   `AddPolicyDrivenAuthorization()`). See `Authorization/README.md` for a real bug this
   surfaced: a policy *name* containing `:` doesn't survive `IConfiguration` binding (`:` is its
   own path separator), so policy names and OAuth2 scope values (which use `:` freely) must stay
-  separate constants — same principle as `Authentication/AuthorizationPolicies.cs` already
-  documented, now with a concrete failure mode behind it.
+  separate constants (e.g. `WeatherPolicies` / `WeatherScopes` in
+  `Features/Weather/WeatherAuthorization.cs`). Those constants belong to the feature slice,
+  never `KAM.Common` — the library holds the mechanism, the app owns its policies and scopes
+  (dev-token scopes come from `Jwt:DevTokenScopes` in `appsettings.Development.json`).
 - **`DependencyInjection/`** (in `KAM.Common`) — the reflection-registration conventions, one
   folder per concern (`Endpoints/`, `Settings/`, `Dependencies/`, `RequestHandlers/`,
   `ExceptionHandling/`) — see its README. **Every scan takes an explicit

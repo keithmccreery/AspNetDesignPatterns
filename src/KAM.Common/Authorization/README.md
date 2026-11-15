@@ -51,8 +51,8 @@ as a literal string; it becomes *two* nested configuration sections (`weather`, 
 so the dictionary never gets an entry literally named `"weather:read"`, and
 `.RequireAuthorization("weather:read")` fails at request time with
 `AuthorizationPolicy named 'weather:read' was not found` — a real bug hit and fixed while
-building this, not a hypothetical. This is exactly why [`AuthorizationPolicies.WeatherRead`](../Authentication/AuthorizationPolicies.cs)
-(the policy *name*, `"WeatherRead"`) and `Scopes.WeatherRead` (the scope *value*,
+building this, not a hypothetical. This is exactly why `WeatherPolicies.Read` (in the app's `Features/Weather/WeatherAuthorization.cs`;
+the policy *name*, `"WeatherRead"`) and `WeatherScopes.Read` (the scope *value*,
 `"weather:read"`) are separate constants — the policy name has to avoid `:`, the scope value
 is an OAuth2 convention that uses `:` freely, and conflating them would force a choice that
 breaks one or the other.

@@ -53,6 +53,13 @@ public sealed class JwtOptions : SettingsBase<JwtOptions>
     public bool SaveToken { get; init; }
 
     /// <summary>
+    /// The OAuth2 scopes the Development-only dev-token endpoint grants, as one space-delimited
+    /// <c>scope</c> claim. Empty by default (no <c>scope</c> claim at all): which scopes exist is
+    /// the consuming app's business, so set it in that app's <c>appsettings.Development.json</c>.
+    /// </summary>
+    public List<string> DevTokenScopes { get; init; } = [];
+
+    /// <summary>
     /// The claim type checked by <c>RequireRole(...)</c> when <see cref="RoleClaimType"/> is unset —
     /// the raw JWT claim Entra ID and most identity providers emit.
     /// </summary>

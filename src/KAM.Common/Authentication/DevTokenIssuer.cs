@@ -28,12 +28,7 @@ internal sealed class DevTokenIssuer(IOptions<JwtOptions> jwtOptions, TimeProvid
             IssuedAt = now.UtcDateTime,
             NotBefore = now.UtcDateTime,
             Expires = expires.UtcDateTime,
-            Subject = new ClaimsIdentity(
-            [
-                new Claim(JwtRegisteredClaimNames.Sub, subject),
-                new Claim(JwtRegisteredClaimNames.Name, subject), // the raw "name" claim a real IdP sends
-                new Claim("scope", string.Join(' ', Scopes.Default)), // standard OAuth2 shape: one space-delimited claim
-            ]),
+            Subject = new ClaimsIdentity(Claims(subject)),
             SigningCredentials = new SigningCredentials(
                 new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwt.SigningKey)),
                 SecurityAlgorithms.HmacSha256),
@@ -41,5 +36,17 @@ internal sealed class DevTokenIssuer(IOptions<JwtOptions> jwtOptions, TimeProvid
 
         string token = new JsonWebTokenHandler().CreateToken(descriptor);
         return new TokenResponse(token, expires);
+    }
+
+    private IEnumerable<Claim> Claims(string subject)
+    {
+        yield return new Claim(JwtRegisteredClaimNames.Sub, subject);
+        yield return new Claim(JwtRegisteredClaimNames.Name, subject); // the raw "name" claim a real IdP sends
+
+        if (_jwt.DevTokenScopes.Count > 0)
+        {
+            // Standard OAuth2 shape: one space-delimited claim.
+            yield return new Claim("scope", string.Join(' ', _jwt.DevTokenScopes));
+        }
     }
 }

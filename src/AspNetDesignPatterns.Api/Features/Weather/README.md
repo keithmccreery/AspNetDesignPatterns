@@ -21,6 +21,7 @@ copy this folder's shape when adding a feature.
 | `OpenMeteoForecast.cs` | The upstream JSON shape (client boundary only). |
 | `WeatherOptions.cs` | `SettingsBase<WeatherOptions>` — binds the `Weather` section + FluentValidation validator. |
 | `WeatherProviderHealthCheck.cs` | `IHealthCheck` — readiness probe for open-meteo. Reports `Degraded` (not `Unhealthy`) when it's down, since the endpoint degrades to a 502. |
+| `WeatherAuthorization.cs` | `WeatherPolicies.Read` (the policy *name* the endpoint requires) and `WeatherScopes.Read` (the scope *value* its config checks) — the slice owns its authorization vocabulary, not `KAM.Common`. |
 | `WeatherDependencies.cs` | `IDependency` — registers `WeatherService`, the typed client, the health-check client (resilience removed), and the `ready`-tagged check. |
 
 ## Request flow
@@ -29,7 +30,7 @@ copy this folder's shape when adding a feature.
 HTTP GET /api/v1/weather/forecast
   │
   ▼
-GetForecastEndpoint ──────────────── RequireAuthorization("weather:read")   ← Shared/Auth
+GetForecastEndpoint ──────────────── RequireAuthorization(WeatherPolicies.Read)   ← Shared/Auth
   │                                   ValidationFilter<GetForecastRequest>  ← Shared/FluentValidations
   │                                     └─ invalid → 400 ProblemDetails (never reaches the handler)
   ▼

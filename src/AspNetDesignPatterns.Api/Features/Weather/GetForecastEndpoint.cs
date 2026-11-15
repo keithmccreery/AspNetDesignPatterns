@@ -1,4 +1,3 @@
-using KAM.Common.Authentication;
 using KAM.Common.DependencyInjection;
 using KAM.Common.FluentValidations;
 using KAM.Common.Handlers;
@@ -28,7 +27,7 @@ internal sealed class GetForecastEndpoint : IEndpoint
             .WithName("GetWeatherForecast")
             .WithTags("Weather")
             .WithSummary("Get a daily weather forecast for a set of coordinates.")
-            .RequireAuthorization(AuthorizationPolicies.WeatherRead)
+            .RequireAuthorization(WeatherPolicies.Read)
             .ValidateRequest<GetForecastRequest>()
             .Produces<ForecastResponse>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
