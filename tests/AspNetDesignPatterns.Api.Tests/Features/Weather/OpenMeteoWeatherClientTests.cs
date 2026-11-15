@@ -4,8 +4,6 @@ using System.Text.Json;
 using AspNetDesignPatterns.Api.Features.Weather;
 using AspNetDesignPatterns.Api.Tests.TestSupport;
 
-using Microsoft.Extensions.Logging.Abstractions;
-
 using Polly.CircuitBreaker;
 using Polly.RateLimiting;
 using Polly.Timeout;
@@ -34,7 +32,7 @@ public class OpenMeteoWeatherClientTests
         HttpClient httpClient = new(handler) { BaseAddress = new Uri("https://weather.test") };
         JsonSerializerOptions jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-        return (new OpenMeteoWeatherClient(httpClient, jsonOptions, NullLogger<OpenMeteoWeatherClient>.Instance), handler);
+        return (new OpenMeteoWeatherClient(httpClient, jsonOptions), handler);
     }
 
     [Test]
@@ -68,35 +66,24 @@ public class OpenMeteoWeatherClientTests
         (OpenMeteoWeatherClient client, _) = CreateClient(new StubHttpMessageHandler(HttpStatusCode.OK, WELL_FORMED_BODY));
 
         // Act
-        OpenMeteoForecast? forecast = await client.GetForecastAsync(52.5, 13.4, 2, CancellationToken.None);
+        OpenMeteoForecast forecast = await client.GetForecastAsync(52.5, 13.4, 2, CancellationToken.None);
 
         // Assert
         using (new AssertionScope())
         {
-            forecast.Should().NotBeNull();
-            forecast!.Daily!.Time.Should().HaveCount(2);
+            forecast.Daily!.Time.Should().HaveCount(2);
             forecast.Daily.TemperatureMax[0].Should().Be(20.1);
         }
     }
 
-    [Test]
-    public async Task Returns_null_when_the_provider_rejects_the_request_as_a_bad_request()
+    // 400 included: the validator bounds every parameter, so a 400 is open-meteo rejecting a
+    // request *we* built -- a provider failure, not "the caller's location is unknown".
+    [TestCase(HttpStatusCode.BadRequest)]
+    [TestCase(HttpStatusCode.ServiceUnavailable)]
+    public Task Throws_WeatherClientException_when_the_response_is_not_a_success(HttpStatusCode status)
     {
         // Arrange
-        (OpenMeteoWeatherClient client, _) = CreateClient(new StubHttpMessageHandler(HttpStatusCode.BadRequest));
-
-        // Act
-        OpenMeteoForecast? forecast = await client.GetForecastAsync(999, 0, 1, CancellationToken.None);
-
-        // Assert
-        forecast.Should().BeNull();
-    }
-
-    [Test]
-    public Task Throws_WeatherClientException_when_the_response_is_a_server_error()
-    {
-        // Arrange
-        (OpenMeteoWeatherClient client, _) = CreateClient(new StubHttpMessageHandler(HttpStatusCode.ServiceUnavailable));
+        (OpenMeteoWeatherClient client, _) = CreateClient(new StubHttpMessageHandler(status));
 
         // Act
         Func<Task> act = () => client.GetForecastAsync(0, 0, 1, CancellationToken.None);
@@ -181,9 +168,11 @@ public class OpenMeteoWeatherClientTests
         await act.Should().ThrowAsync<TaskCanceledException>();
     }
 
+    [TestCase("null")]
+    [TestCase("""{"latitude":0,"longitude":0,"timezone":"UTC","daily":null}""")]
     [TestCase("""{"latitude":0,"longitude":0,"timezone":"UTC","daily":{"time":["2026-09-09","2026-09-10"],"temperature_2m_max":[20.1],"temperature_2m_min":[10.4,11.9],"precipitation_sum":[0.0,2.5]}}""")]
     [TestCase("""{"latitude":0,"longitude":0,"timezone":"UTC","daily":{"time":["2026-09-09"],"temperature_2m_max":null,"temperature_2m_min":[10.4],"precipitation_sum":[0.0]}}""")]
-    public Task Throws_WeatherClientException_when_the_daily_arrays_are_missing_or_mismatched(string malformedBody)
+    public Task Throws_WeatherClientException_when_the_daily_forecast_is_missing_or_malformed(string malformedBody)
     {
         // Arrange
         (OpenMeteoWeatherClient client, _) = CreateClient(new StubHttpMessageHandler(HttpStatusCode.OK, malformedBody));

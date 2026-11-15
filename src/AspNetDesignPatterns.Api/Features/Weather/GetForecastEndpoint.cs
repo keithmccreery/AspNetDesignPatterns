@@ -32,7 +32,6 @@ internal sealed class GetForecastEndpoint : IEndpoint
             .ValidateRequest<GetForecastRequest>()
             .Produces<ForecastResponse>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status502BadGateway);
     }
 }
