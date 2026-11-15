@@ -23,7 +23,9 @@ provider. **Authorization** — what the caller can do — is a separate concern
 Beyond `SigningKey`/`Issuer`/`Audience`/`AccessTokenMinutes`: `ValidateIssuer`,
 `ValidateAudience`, `ValidateLifetime` (all default `true`), `ClockSkewSeconds` (default `30`,
 range 0–3600), `SaveToken` (default `false`), and optional `NameClaimType`/`RoleClaimType`
-overrides. All of these used to be hardcoded in `AddJwtAuth()` — moving them to config means
+overrides (defaults `name` / `roles` — the raw JWT claim names, because `MapInboundClaims` is
+off; the `ClaimTypes.*` URIs only exist after inbound mapping, so defaulting to them would leave
+`Identity.Name` null and every `RequiredRoles` policy unsatisfiable for a real IdP's token). All of these used to be hardcoded in `AddJwtAuth()` — moving them to config means
 tightening (or, for a test environment, loosening) token validation doesn't need a code change.
 
 ## Why the policy name and the scope value are separate constants

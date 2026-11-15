@@ -96,6 +96,23 @@ public class AuthExtensionsTests
     }
 
     [Test]
+    public void Defaults_the_name_and_role_claim_types_to_the_raw_jwt_claim_names()
+    {
+        // Arrange & Act — MapInboundClaims is off, so ClaimTypes.Name/Role URIs would never match.
+        using ServiceProvider provider = BuildProvider();
+        JwtBearerOptions bearer = provider.GetRequiredService<IOptionsMonitor<JwtBearerOptions>>()
+            .Get(JwtBearerDefaults.AuthenticationScheme);
+
+        // Assert
+        using (new AssertionScope())
+        {
+            bearer.MapInboundClaims.Should().BeFalse();
+            bearer.TokenValidationParameters.NameClaimType.Should().Be("name");
+            bearer.TokenValidationParameters.RoleClaimType.Should().Be("roles");
+        }
+    }
+
+    [Test]
     public void Overrides_the_name_and_role_claim_types_when_configured()
     {
         // Arrange & Act

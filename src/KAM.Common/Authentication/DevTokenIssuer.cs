@@ -31,7 +31,7 @@ internal sealed class DevTokenIssuer(IOptions<JwtOptions> jwtOptions, TimeProvid
             Subject = new ClaimsIdentity(
             [
                 new Claim(JwtRegisteredClaimNames.Sub, subject),
-                new Claim(ClaimTypes.Name, subject),
+                new Claim(JwtRegisteredClaimNames.Name, subject), // the raw "name" claim a real IdP sends
                 new Claim("scope", string.Join(' ', Scopes.Default)), // standard OAuth2 shape: one space-delimited claim
             ]),
             SigningCredentials = new SigningCredentials(

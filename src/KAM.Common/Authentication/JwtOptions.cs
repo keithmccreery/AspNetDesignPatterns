@@ -52,9 +52,19 @@ public sealed class JwtOptions : SettingsBase<JwtOptions>
     /// <summary>Whether to save the raw token in <c>HttpContext.Items</c> via <c>AuthenticationProperties</c>.</summary>
     public bool SaveToken { get; init; }
 
-    /// <summary>Overrides the claim type mapped to <c>ClaimsIdentity.Name</c>; defaults to <see cref="System.Security.Claims.ClaimTypes.Name"/> when unset.</summary>
+    /// <summary>
+    /// The claim type checked by <c>RequireRole(...)</c> when <see cref="RoleClaimType"/> is unset —
+    /// the raw JWT claim Entra ID and most identity providers emit.
+    /// </summary>
+    public const string DefaultRoleClaimType = "roles";
+
+    /// <summary>
+    /// Overrides the claim type mapped to <c>ClaimsIdentity.Name</c>; defaults to the raw JWT
+    /// <c>name</c> claim when unset (inbound claim mapping is off, so the token's own claim
+    /// names are what the identity sees).
+    /// </summary>
     public string? NameClaimType { get; init; }
 
-    /// <summary>Overrides the claim type checked by <c>RequireRole(...)</c>; defaults to <see cref="System.Security.Claims.ClaimTypes.Role"/> when unset.</summary>
+    /// <summary>Overrides the claim type checked by <c>RequireRole(...)</c>; defaults to <see cref="DefaultRoleClaimType"/> when unset.</summary>
     public string? RoleClaimType { get; init; }
 }

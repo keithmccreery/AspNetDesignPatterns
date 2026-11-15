@@ -36,6 +36,7 @@ public class DevTokenIssuerTests
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SIGNING_KEY)),
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromSeconds(5),
+            NameClaimType = "name",
         };
 
         // Act
@@ -47,6 +48,7 @@ public class DevTokenIssuerTests
             response.TokenType.Should().Be("Bearer");
             validation.IsValid.Should().BeTrue();
             validation.Claims.Should().ContainKey("sub").WhoseValue.Should().Be("alice");
+            validation.ClaimsIdentity.Name.Should().Be("alice");
             validation.Claims.Should().ContainKey("scope").WhoseValue.Should().Be("weather:read");
         }
     }
