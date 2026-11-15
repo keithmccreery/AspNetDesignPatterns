@@ -24,8 +24,15 @@ internal sealed class GetForecastHandler(IPipelineFactory pipelineFactory)
 
         Result result = await pipeline.ExecuteAsync(context, cancellationToken);
 
-        return result.IsFailure
-            ? Result.Failure<ForecastResponse>(result.Error)
-            : context.Response!;
+        if (result.IsFailure)
+        {
+            return result.Error;
+        }
+
+        // A step that short-circuits with success (or forgets to set Response) is a bug in this
+        // pipeline -- surface it as a 500 rather than a 200 with a null body.
+        return context.Response is { } response
+            ? response
+            : Error.Failure("Weather.NoResponse", "The forecast pipeline completed without producing a response.");
     }
 }
