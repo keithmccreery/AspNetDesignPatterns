@@ -34,7 +34,7 @@ which subfolder they live in — the subfolder is filing, not a namespace bounda
 | `AddEndpoints(assemblies)` | `IEndpoint` | `IEndpoint` (transient, `TryAddEnumerable` — idempotent) |
 | `AddSettings(assemblies)` | `ISettings` | instantiates each, calls `RegisterSettings(services)` |
 | `AddDependencies(assemblies)` | `IDependency` | instantiates each, calls `RegisterServices(services)` |
-| `AddRequestHandlers(assemblies)` | closed `IRequestHandler<,>` impls | the closed interface → impl (scoped) |
+| `AddRequestHandlers(assemblies)` | closed `IRequestHandler<,>` impls | the closed interface → impl (scoped, `TryAdd` — idempotent; two different handlers for one request type fail startup instead of last-one-wins) |
 | `AddGlobalExceptionHandler()` | — | `GlobalExceptionHandler` as the app's `IExceptionHandler` |
 | `AddPipeline()` / `AddPipelineSteps(assemblies)` | (see [`../Pipeline`](../Pipeline/README.md)) | factory + steps (scoped) |
 | `MapEndpoints(versionedGroup)` | resolves `IEndpoint`s | calls `MapEndpoint` on each, onto the versioned route group |

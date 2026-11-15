@@ -3,6 +3,8 @@ using KAM.Common.Results;
 
 using Microsoft.Extensions.DependencyInjection;
 
+using NSubstitute;
+
 namespace KAM.Common.Tests.DependencyInjection.RequestHandlers;
 
 [TestFixture]
@@ -48,5 +50,35 @@ public class RequestHandlerRegistrationTests
 
         // Assert
         services.BuildServiceProvider().GetService<IRequestHandler<Ping, int>>().Should().BeOfType<PingHandler>();
+    }
+
+    [Test]
+    public void AddRequestHandlers_is_idempotent()
+    {
+        // Arrange
+        ServiceCollection services = new();
+
+        // Act
+        services.AddRequestHandlers(ThisAssembly);
+        services.AddRequestHandlers(ThisAssembly, ThisAssembly);
+
+        // Assert
+        services.Count(d => d.ServiceType == typeof(IRequestHandler<Ping, int>)).Should().Be(1);
+    }
+
+    [Test]
+    public void AddRequestHandlers_fails_fast_when_a_request_already_has_a_different_handler()
+    {
+        // Arrange — a second handler class in this assembly would break every scan here, so the
+        // competing handler is an already-registered instance instead.
+        ServiceCollection services = new();
+        services.AddSingleton(Substitute.For<IRequestHandler<Ping, int>>());
+
+        // Act
+        Action act = () => services.AddRequestHandlers(ThisAssembly);
+
+        // Assert
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*IRequestHandler<Ping, Int32>*PingHandler*exactly one handler*");
     }
 }
