@@ -11,12 +11,13 @@ namespace KAM.Common.Tests.DependencyInjection.Settings;
 /// <summary>
 /// <see cref="SettingsBase{T}"/> binds a settings class to its <c>Section</c> and validates
 /// on startup — FluentValidation when a validator is registered, DataAnnotations otherwise.
+/// (A class with no <c>Section</c> at all no longer compiles, so there's no test for that.)
 /// </summary>
 [TestFixture]
 public class SettingsBaseTests
 {
     // Has a FluentValidation validator -> validated via FluentValidation.
-    private sealed class FluentSettings : SettingsBase<FluentSettings>
+    private sealed class FluentSettings : SettingsBase<FluentSettings>, ISettingsSection
     {
         public static string Section => "Fluent";
 
@@ -29,7 +30,7 @@ public class SettingsBaseTests
     }
 
     // No validator -> validated via DataAnnotations.
-    private sealed class DataAnnotationsSettings : SettingsBase<DataAnnotationsSettings>
+    private sealed class DataAnnotationsSettings : SettingsBase<DataAnnotationsSettings>, ISettingsSection
     {
         public static string Section => "DataAnnotations";
 
@@ -37,22 +38,40 @@ public class SettingsBaseTests
         public int Count { get; init; }
     }
 
-    // Declares no Section -> RegisterSettings must fail fast.
-    private sealed class NoSectionSettings : SettingsBase<NoSectionSettings>;
+    // Section compiles but is empty -> RegisterSettings must fail fast. Internal (not private)
+    // so SettingsRegistrationTests can name it.
+    internal sealed class EmptySectionSettings : SettingsBase<EmptySectionSettings>, ISettingsSection
+    {
+        public static string Section => string.Empty;
+    }
 
-    private static IOptions<T> Resolve<T>(Dictionary<string, string?> config, bool withValidator)
+    // Names a different (valid) settings type -> compiles, so RegisterSettings must catch it.
+    private sealed class MisnamedSettings : SettingsBase<DataAnnotationsSettings>, ISettingsSection
+    {
+        public static string Section => "Misnamed";
+    }
+
+    private static IOptions<T> Resolve<T>(
+        Dictionary<string, string?> config,
+        bool withValidator,
+        bool validatorRegisteredAfterSettings = false)
         where T : class, ISettings, new()
     {
         ServiceCollection services = new();
-        if (withValidator)
+        if (withValidator && !validatorRegisteredAfterSettings)
         {
-            services.AddSingleton<IValidator<FluentSettings>, FluentSettingsValidator>();
+            services.AddScoped<IValidator<FluentSettings>, FluentSettingsValidator>();
         }
 
         IConfigurationRoot configuration = new ConfigurationBuilder().AddInMemoryCollection(config).Build();
         services.AddSingleton<IConfiguration>(configuration);
 
         new T().RegisterSettings(services);
+
+        if (withValidator && validatorRegisteredAfterSettings)
+        {
+            services.AddScoped<IValidator<FluentSettings>, FluentSettingsValidator>();
+        }
 
         return services.BuildServiceProvider().GetRequiredService<IOptions<T>>();
     }
@@ -72,6 +91,20 @@ public class SettingsBaseTests
     {
         // Arrange & Act
         IOptions<FluentSettings> options = Resolve<FluentSettings>(new() { ["Fluent:Name"] = "" }, withValidator: true);
+
+        // Assert
+        options.Invoking(o => o.Value).Should().Throw<OptionsValidationException>()
+            .WithMessage("*FluentSettings.Name*");
+    }
+
+    [Test]
+    public void FluentValidation_path_is_used_even_when_the_validator_is_registered_after_the_settings()
+    {
+        // Arrange & Act — this used to fall back to DataAnnotations (which has no rule for Name,
+        // so it would have *accepted* the empty value): the validator was looked for at
+        // registration time, before it existed.
+        IOptions<FluentSettings> options = Resolve<FluentSettings>(
+            new() { ["Fluent:Name"] = "" }, withValidator: true, validatorRegisteredAfterSettings: true);
 
         // Assert
         options.Invoking(o => o.Value).Should().Throw<OptionsValidationException>()
@@ -102,12 +135,36 @@ public class SettingsBaseTests
     }
 
     [Test]
-    public void A_settings_class_without_a_Section_fails_fast_on_registration()
+    public void A_settings_class_with_an_empty_Section_fails_fast_on_registration()
     {
         // Arrange
-        Action act = () => new NoSectionSettings().RegisterSettings(new ServiceCollection());
+        Action act = () => new EmptySectionSettings().RegisterSettings(new ServiceCollection());
 
         // Act & Assert
-        act.Should().Throw<InvalidOperationException>().WithMessage("*Section*");
+        act.Should().Throw<InvalidOperationException>().WithMessage("*EmptySectionSettings.Section*");
+    }
+
+    [Test]
+    public void A_settings_class_naming_another_type_as_T_fails_fast_on_registration()
+    {
+        // Arrange
+        Action act = () => new MisnamedSettings().RegisterSettings(new ServiceCollection());
+
+        // Act & Assert
+        act.Should().Throw<InvalidOperationException>().WithMessage("*SettingsBase<MisnamedSettings>*");
+    }
+
+    [Test]
+    public void Registering_the_same_settings_twice_adds_one_validator()
+    {
+        // Arrange
+        ServiceCollection services = new();
+
+        // Act
+        new DataAnnotationsSettings().RegisterSettings(services);
+        new DataAnnotationsSettings().RegisterSettings(services);
+
+        // Assert
+        services.Count(d => d.ServiceType == typeof(IValidateOptions<DataAnnotationsSettings>)).Should().Be(1);
     }
 }

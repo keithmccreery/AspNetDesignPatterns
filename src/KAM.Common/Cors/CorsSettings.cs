@@ -16,7 +16,7 @@ namespace KAM.Common.Cors;
 /// the primary path. <see cref="AllowedOrigins"/> still carries <c>[Required]</c> so an empty
 /// list is caught even if the validator is ever removed.
 /// </remarks>
-public sealed class CorsSettings : SettingsBase<CorsSettings>
+public sealed class CorsSettings : SettingsBase<CorsSettings>, ISettingsSection
 {
     public static string Section => "Cors";
 

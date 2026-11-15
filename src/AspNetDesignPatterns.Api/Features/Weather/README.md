@@ -112,7 +112,7 @@ rule and the config can't drift apart.
    `IEndpoint`.
 3. If the feature needs its own services (a typed client, a repository), add an
    `IDependency`.
-4. If it reads configuration, add a `SettingsBase<T>` class (and a validator if you want
+4. If it reads configuration, add a `SettingsBase<T>, ISettingsSection` class (and a validator if you want
    FluentValidation rather than DataAnnotations).
 5. That's it — reflection registers all of the above; no central file to edit.
 

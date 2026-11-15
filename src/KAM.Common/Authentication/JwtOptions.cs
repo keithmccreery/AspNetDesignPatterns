@@ -13,7 +13,7 @@ namespace KAM.Common.Authentication;
 /// This class has <em>no</em> FluentValidation validator, so <see cref="SettingsBase{T}"/>
 /// validates it with the DataAnnotations attributes below — the fallback path.
 /// </remarks>
-public sealed class JwtOptions : SettingsBase<JwtOptions>
+public sealed class JwtOptions : SettingsBase<JwtOptions>, ISettingsSection
 {
     public static string Section => "Jwt";
 

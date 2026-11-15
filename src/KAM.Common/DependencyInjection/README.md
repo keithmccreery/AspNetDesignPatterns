@@ -7,12 +7,12 @@ feature never means editing this folder or `Program.cs`.**
 One folder per concern (mirroring `../Pipeline/`'s shape — one cohesive folder per concern,
 not a flat bucket): each pairs the contract with the registration extension that scans for
 it, and — where the contract has a shape of its own to explain — its `SettingsBase<T>` /
-`FluentValidateOptions<T>` neighbors.
+`ISettingsSection` / `SettingsValidateOptions<T>` neighbors.
 
 | Folder | Contract | Registration extension |
 |---|---|---|
 | `Endpoints/` | `IEndpoint` — `void MapEndpoint(IEndpointRouteBuilder app)` | `EndpointRegistration`: `AddEndpoints()`, `MapEndpoints()` |
-| `Settings/` | `ISettings`, `SettingsBase<T>`, `FluentValidateOptions<T>` | `SettingsRegistration`: `AddSettings()` |
+| `Settings/` | `ISettings` (scan marker), `ISettingsSection` (`static abstract Section`), `SettingsBase<T>`, `SettingsValidateOptions<T>` | `SettingsRegistration`: `AddSettings()` |
 | `Dependencies/` | `IDependency` — `void RegisterServices(IServiceCollection services)` | `DependencyRegistration`: `AddDependencies()` |
 | `RequestHandlers/` | (contract is `IRequestHandler<,>`, in `../Handlers/`) | `RequestHandlerRegistration`: `AddRequestHandlers()` |
 | `ExceptionHandling/` | `GlobalExceptionHandler` (`IExceptionHandler`) | `ExceptionHandlingRegistration`: `AddGlobalExceptionHandler()` |
@@ -48,33 +48,90 @@ type living in either one needs to be found. Missing this is exactly how `JwtOpt
 [`../README.md`](../README.md) for the story. If a third project is ever added that can
 define an endpoint/setting/dependency/handler/step, extend the array in `Program.cs`.
 
-Order also still matters: `AddValidatorsFromAssemblies(...)` **before** `AddSettings(...)`, so
-`SettingsBase` can detect a registered `IValidator<T>` and pick the FluentValidation path over
-DataAnnotations.
-
 ## `SettingsBase<T>`
 
+A settings class derives from `SettingsBase<T>` (naming itself as `T`) **and** implements
+`ISettingsSection`:
+
 ```csharp
-public sealed class WeatherOptions : SettingsBase<WeatherOptions>
+public sealed class WeatherOptions : SettingsBase<WeatherOptions>, ISettingsSection
 {
-    public static string Section => "Weather";        // required — RegisterSettings throws without it
+    public static string Section => "Weather";        // required — the build fails without it
     public string BaseAddress { get; init; } = "https://api.open-meteo.com";
-    // …
+    public int MaxForecastDays { get; init; } = 16;
 }
 ```
 
-- If an `IValidator<WeatherOptions>` is registered → validated with FluentValidation
-  (per-rule failure messages surface as startup errors).
-- Otherwise → `ValidateDataAnnotations()`.
-- Always `ValidateOnStart()` — a bad `appsettings.json` fails the app immediately, not at
-  first use.
+That binds `appsettings.json`'s `"Weather": { … }` section, and `AddSettings()` picks it up —
+nothing else to register. Inject `IOptions<WeatherOptions>` wherever it's needed.
+
+### Compile-time guarantees
+
+`SettingsBase<T>` is constrained `where T : SettingsBase<T>, ISettingsSection`, and
+`ISettingsSection.Section` is `static abstract`. So:
+
+| Mistake | Before | Now |
+|---|---|---|
+| Forgot `Section` | startup exception (reflection lookup) | **build error** (CS0311: `T` doesn't implement `ISettingsSection`) |
+| `class FooOptions : SettingsBase<BarOptions>` (copy-paste) | silently registered `BarOptions` | startup exception (it compiles when `BarOptions` is itself valid, so `RegisterSettings` checks) |
+| `Section => ""` | startup exception | startup exception (only the *value* can still be wrong) |
+
+`ISettingsSection` is separate from `ISettings` because an abstract base class can't satisfy
+a `static abstract` member for its subclasses — so each concrete settings class declares it.
+
+### Validation: FluentValidation or DataAnnotations, chosen when it runs
+
+Every settings type is validated on startup (`ValidateOnStart()`), by `SettingsValidateOptions<T>`:
+
+- An `IValidator<T>` is registered → **FluentValidation**; every rule failure becomes its own
+  startup error line (`WeatherOptions.MaxForecastDays: …`).
+- No validator → the class's **DataAnnotations** attributes.
+
+```csharp
+// FluentValidation: just add a validator next to the settings class. The app's
+// AddValidatorsFromAssemblies(...) registers it; nothing else changes.
+internal sealed class WeatherOptionsValidator : AbstractValidator<WeatherOptions>
+{
+    public WeatherOptionsValidator()
+    {
+        RuleFor(x => x.BaseAddress).Must(uri => Uri.TryCreate(uri, UriKind.Absolute, out _));
+        RuleFor(x => x.MaxForecastDays).InclusiveBetween(1, 16);
+    }
+}
+
+// DataAnnotations: no validator, attributes on the properties instead.
+public sealed class JwtOptions : SettingsBase<JwtOptions>, ISettingsSection
+{
+    public static string Section => "Jwt";
+
+    [Required, MinLength(32)]
+    public string SigningKey { get; init; } = string.Empty;
+
+    [Range(1, 1440)]
+    public int AccessTokenMinutes { get; init; } = 60;
+}
+```
+
+The choice is made **when validation runs** (after the container is built), not when
+`AddSettings()` runs — so it no longer matters whether validators are registered before or
+after the settings. (It used to: registering validators afterwards silently fell back to
+DataAnnotations, which for a FluentValidation-only class means *no* validation at all. That
+ordering rule is gone; `SettingsBaseTests` pins it.) Prefer FluentValidation once a rule spans
+properties (`TotalRequestTimeout > AttemptTimeout`) or needs more than an attribute can say.
+
+### Collection properties: default to empty
+
+The configuration binder *appends* to a collection that already has items, so a non-empty
+initializer can never be narrowed from config — default collections to `[]` and apply the
+real default where the value is used (see `Cors/README.md` for the bug this caused).
 
 ## Adding a feature
 
 1. Create `Features/<Name>/` (in `AspNetDesignPatterns.Api`, not `KAM.Common`).
 2. Add a request + `AbstractValidator`, a response DTO, an `IRequestHandler`, an `IEndpoint`.
 3. Feature-owned services (typed client, repository)? Add an `IDependency`.
-4. Reads config? Add a `SettingsBase<T>` (+ a validator if you want FluentValidation).
+4. Reads config? Add a `SettingsBase<T>, ISettingsSection` class (+ a validator if you want
+   FluentValidation).
 5. Done — the scans pick all of it up, from either assembly.
 
 ## Tests
@@ -82,8 +139,9 @@ public sealed class WeatherOptions : SettingsBase<WeatherOptions>
 `tests/KAM.Common.Tests/DependencyInjection/` mirrors this folder's
 shape — `Endpoints/EndpointRegistrationTests`, `Dependencies/DependencyRegistrationTests`,
 `RequestHandlers/RequestHandlerRegistrationTests` (each scan, against fixtures declared in the
-test assembly), `Settings/SettingsBaseTests` (both validation paths, missing `Section` fails
-fast), `ExceptionHandling/GlobalExceptionHandlerTests` (500 + `ProblemDetails`, declines
+test assembly), `Settings/SettingsBaseTests` (both validation paths, FluentValidation still chosen when the
+validator is registered *after* the settings, empty `Section` and a misnamed `T` fail fast, re-registering adds
+one validator), `ExceptionHandling/GlobalExceptionHandlerTests` (500 + `ProblemDetails`, declines
 gracefully). The scans *actually finding types across both assemblies* — the one thing a
 KAM.Common-only test can't prove — is `ReflectionRegistrationTests` in
 `tests/AspNetDesignPatterns.Api.Tests/Integration/`.

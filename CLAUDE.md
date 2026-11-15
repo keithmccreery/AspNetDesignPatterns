@@ -102,7 +102,8 @@ Optional: `docker compose up -d` runs a local OTLP collector (.NET Aspire Dashbo
    shape.
 3. **No new registration in `Program.cs` per feature.** Add an `IEndpoint`, `IRequestHandler`,
    `SettingsBase<T>`, `IPipelineStep<>`, or an `IDependency` module — the scans pick it up.
-4. **Settings** = a `SettingsBase<T>` subclass with `public static string Section`. It
+4. **Settings** = `class XOptions : SettingsBase<XOptions>, ISettingsSection` with
+   `public static string Section` (a missing `Section` is a build error). It
    self-registers, binds, and validates on startup (FluentValidation if a validator exists,
    else DataAnnotations).
 5. **Secrets** come from `.env` (`Jwt__SigningKey`), never a committed `appsettings.json`.

@@ -172,8 +172,8 @@ builder.Services.AddMemoryCache();
 // (the calling assembly, i.e. this one) would silently miss KAM.Common's half.
 Assembly[] appAssemblies = [typeof(Program).Assembly, typeof(IEndpoint).Assembly];
 
-// FluentValidation validators — MUST be registered before AddSettings() so SettingsBase<T>
-// can detect them and choose the FluentValidation path over DataAnnotations.
+// FluentValidation validators (request models and settings). Order relative to AddSettings()
+// doesn't matter: SettingsBase<T> picks FluentValidation vs DataAnnotations when validation runs.
 builder.Services.AddValidatorsFromAssemblies(appAssemblies, includeInternalTypes: true);
 
 // ── Convention-based registration (one assembly scan each) ──

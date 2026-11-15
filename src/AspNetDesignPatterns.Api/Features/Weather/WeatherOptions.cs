@@ -12,7 +12,7 @@ namespace AspNetDesignPatterns.Api.Features.Weather;
 /// validates this with FluentValidation — the primary path (contrast with
 /// <see cref="KAM.Common.Authentication.JwtOptions"/>, which has no validator and falls back to DataAnnotations).
 /// </remarks>
-public sealed class WeatherOptions : SettingsBase<WeatherOptions>
+public sealed class WeatherOptions : SettingsBase<WeatherOptions>, ISettingsSection
 {
     public static string Section => "Weather";
 

@@ -10,7 +10,7 @@ namespace KAM.Common.Authorization;
 /// See <see cref="AuthorizationExtensions"/> for how this is turned into real policies, and
 /// this folder's README for the "why" and a worked example.
 /// </summary>
-public sealed class AuthorizationSettings : SettingsBase<AuthorizationSettings>
+public sealed class AuthorizationSettings : SettingsBase<AuthorizationSettings>, ISettingsSection
 {
     public static string Section => "Authorization";
 
