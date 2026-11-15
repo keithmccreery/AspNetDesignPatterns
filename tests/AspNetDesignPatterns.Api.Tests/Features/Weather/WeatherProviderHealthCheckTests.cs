@@ -95,17 +95,17 @@ public class WeatherProviderHealthCheckTests
     [Test]
     public async Task Concurrent_probes_racing_the_cache_share_a_single_outbound_call()
     {
-        // Arrange — NB this passes only because StubHttpMessageHandler completes
-        // synchronously: the first factory call populates the cache before the next caller
-        // starts. IMemoryCache.GetOrCreateAsync takes no lock, so against a real (truly async)
-        // HttpClient concurrent misses would each probe. It guards the cache wiring, not
-        // stampede protection — see the comment in WeatherProviderHealthCheck.
-        StubHttpMessageHandler handler = new(HttpStatusCode.OK);
+        // Arrange — the cache holds the in-flight probe Task, so callers arriving while it's
+        // still running share it. GatedHandler keeps the probe genuinely in flight (unlike
+        // StubHttpMessageHandler, which completes synchronously) until every caller has started.
+        GatedHandler handler = new();
         IMemoryCache cache = new MemoryCache(new MemoryCacheOptions());
         WeatherProviderHealthCheck check = CreateCheck(handler, cache);
 
         // Act
-        await Task.WhenAll(Enumerable.Range(0, 20).Select(_ => check.CheckHealthAsync(Context, CancellationToken.None)));
+        Task<HealthCheckResult>[] probes = [.. Enumerable.Range(0, 20).Select(_ => check.CheckHealthAsync(Context, CancellationToken.None))];
+        handler.Release(HttpStatusCode.OK);
+        await Task.WhenAll(probes);
 
         // Assert
         handler.CallCount.Should().Be(1);
@@ -128,6 +128,49 @@ public class WeatherProviderHealthCheckTests
         {
             firstHandler.CallCount.Should().Be(1);
             secondHandler.CallCount.Should().Be(1);
+        }
+    }
+
+    [Test]
+    public async Task A_caller_that_cancels_mid_probe_does_not_poison_the_cached_result()
+    {
+        // Arrange — the first caller's request is aborted while the probe is in flight.
+        GatedHandler handler = new();
+        WeatherProviderHealthCheck check = CreateCheck(handler);
+        using CancellationTokenSource firstCaller = new();
+
+        Task<HealthCheckResult> abandoned = check.CheckHealthAsync(Context, firstCaller.Token);
+        await firstCaller.CancelAsync();
+
+        // Act
+        Func<Task> waitForAbandoned = () => abandoned;
+        await waitForAbandoned.Should().ThrowAsync<OperationCanceledException>();
+        handler.Release(HttpStatusCode.OK);
+        HealthCheckResult next = await check.CheckHealthAsync(Context, CancellationToken.None);
+
+        // Assert — the shared probe finished and cached the real answer, not "Degraded".
+        using (new AssertionScope())
+        {
+            next.Status.Should().Be(HealthStatus.Healthy);
+            handler.CallCount.Should().Be(1);
+        }
+    }
+
+    /// <summary>Holds every request until <see cref="Release"/>, so a probe stays genuinely in flight.</summary>
+    private sealed class GatedHandler : HttpMessageHandler
+    {
+        private readonly TaskCompletionSource<HttpStatusCode> _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _callCount;
+
+        public int CallCount => _callCount;
+
+        public void Release(HttpStatusCode status) => _gate.SetResult(status);
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _callCount);
+            HttpStatusCode status = await _gate.Task.WaitAsync(cancellationToken);
+            return new HttpResponseMessage(status) { RequestMessage = request };
         }
     }
 }
