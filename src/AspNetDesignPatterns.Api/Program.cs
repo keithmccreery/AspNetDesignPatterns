@@ -41,7 +41,7 @@ builder.Host.UseDefaultServiceProvider(options =>
     options.ValidateScopes = true;
 });
 
-// "Where and how am I running" — built once, used for Kestrel + Scalar gating, then shared.
+// "Where and how am I running" — built once and shared, for code that branches on it.
 AppEnvironment appEnvironment = new(builder.Environment);
 builder.Services.AddSingleton(appEnvironment);
 
@@ -74,14 +74,11 @@ builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = 
 builder.Services.ConfigureHttpJsonOptions(options => ConfigureJsonSerializer(options.SerializerOptions));
 builder.Services.AddSingleton(services => services.GetRequiredService<IOptions<HttpJsonOptions>>().Value.SerializerOptions);
 
-// Kestrel: listen on all interfaces when containerized (or anywhere but local dev).
-builder.WebHost.ConfigureKestrel(options =>
-{
-    if (appEnvironment.IsContainerized || !appEnvironment.IsDevelopment)
-    {
-        options.ListenAnyIP(8080);
-    }
-});
+// No Kestrel port in code: the platform decides. Locally that's launchSettings.json; the .NET
+// container images set ASPNETCORE_HTTP_PORTS=8080; App Service sets its own port variables. A
+// hard-coded ListenAnyIP() here would override all of them. Behind a TLS-terminating proxy
+// (App Service, a load balancer), set ASPNETCORE_FORWARDEDHEADERS_ENABLED=true in that
+// environment so the original scheme and client IP survive the hop -- see README "Deploying".
 
 // Serilog becomes the ILoggerFactory; the rest of the app depends only on ILogger<T>.
 // The ControlCharacterSanitizingEnricher strips CR/LF from every event (CWE-117 log injection).

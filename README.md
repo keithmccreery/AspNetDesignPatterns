@@ -54,6 +54,12 @@ dev-token request only succeeds against a host running in the Development enviro
 design (`DevTokenEndpoint` is Development-only), so it'll 404 against an `Azure` host running
 as anything else.
 
+**Deploying**: the app binds no port in code — the platform's own setting wins
+(`ASPNETCORE_HTTP_PORTS`, which the .NET container images default to `8080`; App Service sets its
+own). Behind a TLS-terminating proxy (App Service, a load balancer) also set
+`ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`, so the request's original scheme and client IP survive
+the hop (logs, redirects, and `ProblemDetails.instance` otherwise see the proxy's).
+
 **Optional — view traces/logs/metrics**: `docker compose up -d` runs a local .NET Aspire
 Dashboard at <http://localhost:18888>; the app's OTLP export already points at it by default.
 Skip this step entirely and the app runs identically — see [`Telemetry/`](src/KAM.Common/Telemetry).
