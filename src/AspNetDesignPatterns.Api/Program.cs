@@ -20,7 +20,11 @@ using KAM.Common.Logging;
 using KAM.Common.OpenApi;
 using KAM.Common.Telemetry;
 
+using Microsoft.Extensions.Options;
+
 using Serilog;
+
+using HttpJsonOptions = Microsoft.AspNetCore.Http.Json.JsonOptions;
 
 // Load .env into environment variables before configuration is built, so values like
 // Jwt__SigningKey are picked up by the default environment-variables configuration source.
@@ -63,20 +67,12 @@ builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = 
         System.Diagnostics.Activity.Current?.Id ?? context.HttpContext.TraceIdentifier;
 });
 
-// One System.Text.Json configuration, shared by Minimal API (de)serialization and typed clients.
-JsonSerializerOptions jsonOptions = CreateJsonSerializerOptions();
-builder.Services.AddSingleton(jsonOptions);
-builder.Services.ConfigureHttpJsonOptions(options =>
-{
-    options.SerializerOptions.PropertyNamingPolicy = jsonOptions.PropertyNamingPolicy;
-    options.SerializerOptions.PropertyNameCaseInsensitive = jsonOptions.PropertyNameCaseInsensitive;
-    options.SerializerOptions.DefaultIgnoreCondition = jsonOptions.DefaultIgnoreCondition;
-    options.SerializerOptions.WriteIndented = jsonOptions.WriteIndented;
-    foreach (JsonConverter converter in jsonOptions.Converters)
-    {
-        options.SerializerOptions.Converters.Add(converter);
-    }
-});
+// One System.Text.Json configuration: ConfigureJsonSerializer() configures the framework's own
+// Minimal API instance, and that *same instance* is what anything injecting
+// JsonSerializerOptions (typed clients, the health-check writer) receives -- no second copy to
+// keep in sync, so a setting added in ConfigureJsonSerializer() can't silently miss one side.
+builder.Services.ConfigureHttpJsonOptions(options => ConfigureJsonSerializer(options.SerializerOptions));
+builder.Services.AddSingleton(services => services.GetRequiredService<IOptions<HttpJsonOptions>>().Value.SerializerOptions);
 
 // Kestrel: listen on all interfaces when containerized (or anywhere but local dev).
 builder.WebHost.ConfigureKestrel(options =>
@@ -220,18 +216,16 @@ app.Run();
 
 // ───────────────────────────────  Methods  ───────────────────────────
 
-// The single source of truth for JSON serialization across the app.
-static JsonSerializerOptions CreateJsonSerializerOptions()
+// The single source of truth for JSON serialization across the app. Applied on top of the
+// framework's JsonSerializerDefaults.Web instance (camelCase, case-insensitive reads, numbers
+// readable from strings); set here only what differs from or must be pinned beyond that.
+static void ConfigureJsonSerializer(JsonSerializerOptions options)
 {
-    JsonSerializerOptions options = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        WriteIndented = false,
-    };
+    options.PropertyNameCaseInsensitive = true;
+    options.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+    options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+    options.WriteIndented = false;
     options.Converters.Add(new JsonStringEnumConverter());
-    return options;
 }
 
 /// <summary>Exposed so the test project's <c>WebApplicationFactory&lt;Program&gt;</c> can boot the app.</summary>
