@@ -31,6 +31,7 @@ internal sealed class GetForecastEndpoint : IEndpoint
             .ValidateRequest<GetForecastRequest>()
             .Produces<ForecastResponse>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden) // authenticated, but missing the policy's scope
             .ProducesProblem(StatusCodes.Status502BadGateway);
     }
 }
