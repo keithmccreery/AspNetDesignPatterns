@@ -22,7 +22,10 @@ public sealed class WeatherOptions : SettingsBase<WeatherOptions>
     /// <summary>Per-request timeout for the typed <see cref="HttpClient"/>.</summary>
     public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(10);
 
-    /// <summary>Upper bound on the forecast window the API will request from upstream.</summary>
+    /// <summary>
+    /// Upper bound on the forecast window a caller may request — enforced by
+    /// <see cref="GetForecastRequestValidator"/>. Can only be lowered from open-meteo's own limit.
+    /// </summary>
     public int MaxForecastDays { get; init; } = 16;
 }
 
@@ -39,6 +42,7 @@ internal sealed class WeatherOptionsValidator : AbstractValidator<WeatherOptions
             .GreaterThan(TimeSpan.Zero)
             .LessThanOrEqualTo(TimeSpan.FromSeconds(30));
 
+        // 16 is open-meteo's own maximum: config may narrow the window, never widen it past that.
         RuleFor(x => x.MaxForecastDays).InclusiveBetween(1, 16);
     }
 }

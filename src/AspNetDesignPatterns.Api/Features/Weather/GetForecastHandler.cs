@@ -5,7 +5,7 @@ namespace AspNetDesignPatterns.Api.Features.Weather;
 
 /// <summary>
 /// Orchestrates the forecast request by composing a <see cref="ForecastContext"/> pipeline
-/// (clamp window → fetch → round) and running it, returning its outcome as a
+/// (fetch → round) and running it, returning its outcome as a
 /// <see cref="Result{T}"/>.
 /// </summary>
 internal sealed class GetForecastHandler(IPipelineFactory pipelineFactory)
@@ -18,7 +18,6 @@ internal sealed class GetForecastHandler(IPipelineFactory pipelineFactory)
         ForecastContext context = new(request);
 
         Pipeline<ForecastContext> pipeline = pipelineFactory.CreateBuilder<ForecastContext>()
-            .Use<ClampForecastWindowStep>()
             .Use<FetchForecastStep>()
             .Use<RoundTemperaturesStep>()
             .Build();

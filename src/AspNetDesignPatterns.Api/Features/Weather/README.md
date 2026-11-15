@@ -11,10 +11,10 @@ copy this folder's shape when adding a feature.
 | File | Role |
 |---|---|
 | `GetForecastEndpoint.cs` | `IEndpoint` — maps the route, wires auth + validation, then `handler.HandleAsync(…).LogOnFailureAsync(logger).ToHttpResultAsync()` (async `Result` chain). |
-| `GetForecastRequest.cs` | Request model (`[AsParameters]`) **and** its `AbstractValidator`. |
+| `GetForecastRequest.cs` | Request model (`[AsParameters]`) **and** its `AbstractValidator` — the one owner of every request rule, including the forecast window (`WeatherOptions.MaxForecastDays`, injected). |
 | `ForecastResponse.cs` | The API's response contract — independent of the upstream shape. |
 | `GetForecastHandler.cs` | `IRequestHandler` — composes and runs the pipeline via `IPipelineFactory`. |
-| `ForecastPipeline.cs` | `ForecastContext` + the middleware steps (clamp window → fetch → round). |
+| `ForecastPipeline.cs` | `ForecastContext` + the middleware steps (fetch → round). |
 | `WeatherService.cs` | First layer above the client: turns values / exceptions into `Result<T>`; maps upstream → contract. |
 | `IWeatherClient.cs` | Client abstraction + `WeatherClientException`. The only layer allowed to throw. |
 | `OpenMeteoWeatherClient.cs` | Typed `HttpClient` implementation (resilience is applied globally). Builds the query with `QueryHelpers.AddQueryString` (URL-encoded, culture-invariant) and validates the daily-forecast shape before returning it, so a malformed-but-parseable payload becomes a `WeatherClientException`, not an unhandled exception three layers up. |
@@ -36,12 +36,10 @@ GetForecastEndpoint ──────────────── RequireAuth
   ▼
 IRequestHandler<GetForecastRequest, ForecastResponse>  =  GetForecastHandler
   │   builds:  factory.CreateBuilder<ForecastContext>()
-  │              .Use<ClampForecastWindowStep>()
   │              .Use<FetchForecastStep>()
   │              .Use<RoundTemperaturesStep>()
   ▼
 Pipeline<ForecastContext>.ExecuteAsync   ← Shared/Pipeline  (middleware: each step gets `next`)
-  ├─ ClampForecastWindowStep   → over the configured max? return Result.Failure(Validation), skip `next`
   ├─ FetchForecastStep         → calls WeatherService; on success sets context.Response, calls `next`
   │      │
   │      ▼
@@ -85,7 +83,9 @@ Anything thrown and not caught (a bug, not an expected failure) is caught by
 
 Validated on startup by `WeatherOptionsValidator` (FluentValidation, because a validator is
 registered). Set `MaxForecastDays` to `999` and the app fails fast with a clear message —
-that is the settings-validation pattern working.
+that is the settings-validation pattern working. Set it to `7` and requests for more than 7
+days get a 400 from `GetForecastRequestValidator`, which reads the same value — the request
+rule and the config can't drift apart.
 
 ## Tests
 

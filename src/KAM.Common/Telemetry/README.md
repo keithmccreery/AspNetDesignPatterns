@@ -158,12 +158,13 @@ Use `AddEvent` for something that happens *at a point in time* during the operat
 than a property of the whole span — e.g. a cache decision:
 
 ```csharp
-using Activity? activity = ActivitySources.Pipeline.StartActivity("ClampForecastWindowStep");
-if (context.Request.Days > options.Value.MaxForecastDays)
+using Activity? activity = ActivitySources.Pipeline.StartActivity("FetchForecastStep");
+Result<ForecastResponse> result = await service.GetForecastAsync(context.Request, cancellationToken);
+if (result.IsFailure)
 {
     activity?.AddEvent(new ActivityEvent(
-        "forecast-window-clamped",
-        tags: [new("weather.requested_days", context.Request.Days), new("weather.max_days", options.Value.MaxForecastDays)]));
+        "forecast-fetch-failed",
+        tags: [new("error.code", result.Error.Code), new("weather.days", context.Request.Days)]));
 }
 ```
 

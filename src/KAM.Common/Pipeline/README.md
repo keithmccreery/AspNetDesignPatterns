@@ -24,13 +24,15 @@ internal sealed class ForecastContext(GetForecastRequest request)
     public ForecastResponse? Response { get; set; }
 }
 
-// a gate step: don't call next -> the rest of the chain is skipped
-internal sealed class ClampWindowStep(IOptions<WeatherOptions> options) : IPipelineStep<ForecastContext>
+// a gate step: don't call next -> the rest of the chain is skipped. (Illustrative: a check
+// that needs a service, like a quota. A rule on the request's own fields belongs in its
+// FluentValidation validator instead, so every 400 has the same shape.)
+internal sealed class QuotaGateStep(IQuotaService quotas) : IPipelineStep<ForecastContext>
 {
-    public Task<Result> ExecuteAsync(ForecastContext ctx, Func<CancellationToken, Task<Result>> next, CancellationToken ct)
-        => ctx.Request.Days > options.Value.MaxForecastDays
-            ? Task.FromResult(Result.Failure(Error.Validation("Weather.WindowTooLarge", "…")))
-            : next(ct);
+    public async Task<Result> ExecuteAsync(ForecastContext ctx, Func<CancellationToken, Task<Result>> next, CancellationToken ct)
+        => await quotas.HasRemainingAsync(ct)
+            ? await next(ct)
+            : Result.Failure(Error.Forbidden("Weather.QuotaExceeded", "…"));
 }
 
 // a post-processing step: run AFTER the rest of the chain
@@ -51,7 +53,7 @@ internal sealed class GetForecastHandler(IPipelineFactory factory) : IRequestHan
     {
         var ctx = new ForecastContext(request);
         var pipeline = factory.CreateBuilder<ForecastContext>()
-            .Use<ClampWindowStep>()
+            .Use<QuotaGateStep>()
             .Use<FetchStep>()
             .Use<RoundStep>()
             .Build();
