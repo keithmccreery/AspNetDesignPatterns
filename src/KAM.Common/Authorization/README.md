@@ -87,14 +87,16 @@ path it doesn't walk.
    `AuthorizationPolicyBuilderExtensions.ApplyPolicySettings`.
 4. Reference it by name in a policy's `CustomRequirements` list in `appsettings.json`.
 
-An unrecognized name in `CustomRequirements` is logged as a warning and skipped, not a startup
-failure — configuration is allowed to name a requirement that doesn't (yet) exist in this
-build.
+An unrecognized name in `CustomRequirements` — or one whose own configuration is missing, like
+`ValidClientIdRequirement` with an empty `AllowedClientIds` — **fails startup**. Authorization
+fails closed: skipping the requirement would leave the policy silently weaker than its config
+says (a typo'd name would let every authenticated caller through), and the error names the
+policy and the requirement.
 
 ## Tests
 
 `tests/KAM.Common.Tests/Authorization/` — `AuthorizationExtensionsTests` (default policy denies
 anonymous, a named policy accepts either scope-claim shape, roles/claims wiring, the custom
-requirement is added when configured and skipped when unrecognized or under-configured, the
+requirement is added when configured and fails startup when unrecognized or under-configured, the
 fallback policy toggle); `Requirements/ValidClientIdHandlerTests` (allowed/case-insensitive/
 denied/missing-claim, against the handler directly — no host needed).

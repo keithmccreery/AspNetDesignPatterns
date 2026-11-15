@@ -24,6 +24,7 @@ internal static class AuthorizationPolicyBuilderExtensions
     /// <param name="requiredRoles">Roles the caller must hold at least one of.</param>
     /// <param name="requiredClaims">Claim type/value pairs the caller must carry.</param>
     /// <param name="customRequirements">Names of extra requirements to add — see <see cref="AuthorizationSettings.AllowedClientIds"/>.</param>
+    /// <exception cref="InvalidOperationException">A custom requirement is unknown, or can't be satisfied by the configuration given.</exception>
     /// <param name="allowedClientIds">The allowlist a <c>"ValidClientIdRequirement"</c> entry checks against.</param>
     /// <param name="logger">Logger for the debug/warning trail below.</param>
     public static AuthorizationPolicyBuilder ApplyPolicySettings(
@@ -60,30 +61,30 @@ internal static class AuthorizationPolicyBuilderExtensions
             logger.LogDebug("Policy '{PolicyName}' requires claim {ClaimType}={ClaimValue}", policyName, claimType, claimValue);
         }
 
+        // Fail closed: a requirement that can't be applied as configured stops the app at startup
+        // (AddPolicyDrivenAuthorization's ValidateOnStart runs this) rather than being dropped.
+        // Dropping it would silently leave the policy *weaker* than its config says -- a typo'd
+        // requirement name, or an empty allowlist, would let every caller through.
         foreach (string customRequirement in customRequirements)
         {
             switch (customRequirement)
             {
                 case nameof(ValidClientIdRequirement):
-                    if (allowedClientIds.Count > 0)
+                    if (allowedClientIds.Count == 0)
                     {
-                        builder.AddRequirements(new ValidClientIdRequirement(allowedClientIds));
-                        logger.LogDebug(
-                            "Policy '{PolicyName}' requires a valid client ID from: {AllowedClientIds}",
-                            policyName, string.Join(", ", allowedClientIds));
-                    }
-                    else
-                    {
-                        logger.LogWarning(
-                            "'{CustomRequirement}' specified for policy '{PolicyName}' but no allowed client IDs are configured",
-                            customRequirement, policyName);
+                        throw new InvalidOperationException(
+                            $"Policy '{policyName}' requires '{customRequirement}', but Authorization:AllowedClientIds is empty.");
                     }
 
+                    builder.AddRequirements(new ValidClientIdRequirement(allowedClientIds));
+                    logger.LogDebug(
+                        "Policy '{PolicyName}' requires a valid client ID from: {AllowedClientIds}",
+                        policyName, string.Join(", ", allowedClientIds));
                     break;
 
                 default:
-                    logger.LogWarning("Unknown custom requirement '{CustomRequirement}' for policy '{PolicyName}'", customRequirement, policyName);
-                    break;
+                    throw new InvalidOperationException(
+                        $"Policy '{policyName}' names an unknown custom requirement '{customRequirement}'.");
             }
         }
 
