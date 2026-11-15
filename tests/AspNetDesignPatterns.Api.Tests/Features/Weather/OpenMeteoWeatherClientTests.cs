@@ -6,6 +6,10 @@ using AspNetDesignPatterns.Api.Tests.TestSupport;
 
 using Microsoft.Extensions.Logging.Abstractions;
 
+using Polly.CircuitBreaker;
+using Polly.RateLimiting;
+using Polly.Timeout;
+
 namespace AspNetDesignPatterns.Api.Tests.Features.Weather;
 
 [TestFixture]
@@ -139,6 +143,26 @@ public class OpenMeteoWeatherClientTests
 
         // Assert
         return act.Should().ThrowAsync<WeatherClientException>();
+    }
+
+    private static IEnumerable<TestCaseData> ResilienceRejections()
+    {
+        yield return new TestCaseData(new BrokenCircuitException("circuit open")).SetArgDisplayNames("circuit open");
+        yield return new TestCaseData(new TimeoutRejectedException("attempt timed out")).SetArgDisplayNames("Polly timeout");
+        yield return new TestCaseData(new RateLimiterRejectedException("rate limited")).SetArgDisplayNames("rate limited");
+    }
+
+    [TestCaseSource(nameof(ResilienceRejections))]
+    public async Task Wraps_a_resilience_handler_rejection_as_a_WeatherClientException(Exception rejection)
+    {
+        // Arrange — what AddStandardResilienceHandler() throws instead of sending the request.
+        (OpenMeteoWeatherClient client, _) = CreateClient(new StubHttpMessageHandler(rejection));
+
+        // Act
+        Func<Task> act = () => client.GetForecastAsync(0, 0, 1, CancellationToken.None);
+
+        // Assert
+        (await act.Should().ThrowAsync<WeatherClientException>()).Which.InnerException.Should().BeSameAs(rejection);
     }
 
     [Test]

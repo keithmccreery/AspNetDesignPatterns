@@ -5,6 +5,8 @@ using System.Text.Json;
 
 using Microsoft.AspNetCore.WebUtilities;
 
+using Polly;
+
 namespace AspNetDesignPatterns.Api.Features.Weather;
 
 /// <summary>
@@ -62,9 +64,15 @@ internal sealed class OpenMeteoWeatherClient(
 
             return forecast;
         }
-        catch (Exception ex) when ((ex is HttpRequestException or TaskCanceledException or JsonException)
+        catch (Exception ex) when ((ex is HttpRequestException or TaskCanceledException or JsonException or ExecutionRejectedException)
             && !cancellationToken.IsCancellationRequested)
         {
+            // ExecutionRejectedException is the base of what the global resilience handler
+            // throws *instead of* calling open-meteo: BrokenCircuitException (circuit open),
+            // TimeoutRejectedException (Polly attempt/total timeout) and
+            // RateLimiterRejectedException. None of them is an HttpRequestException, so without
+            // this they'd escape as a 500 -- exactly when the provider is most unavailable.
+            //
             // Excludes the case where the *caller* cancelled: HttpClient reports both a timeout
             // and a caller-initiated cancellation as TaskCanceledException, and only the former
             // is "the provider is unavailable" -- a cancelled request should propagate as
