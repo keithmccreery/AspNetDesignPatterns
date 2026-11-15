@@ -134,7 +134,9 @@ framework first.
   analyzer rule is advisory, but the codebase has zero `var`; use target-typed `new()` when
   the type is on the left). For a `throws`-assertion lambda use `Func<T>`, not `Action`, so
   the constructed instance is still "used" (avoids CA1806).
-- **No primary constructors** — team preference; classic constructors with explicit fields.
+- **Prefer standard constructors over primary constructors** — team preference; classic
+  constructors with explicit fields for new code. Existing primary constructors are not
+  flagged and needn't be rewritten just to comply.
 - Non-public `const` → `SCREAMING_CASE`; `public const` → PascalCase (BCL convention).
 - Trailing newline on every file.
 - Test names: `Method_under_test_expected_behaviour` (underscores OK in test project).
