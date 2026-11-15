@@ -41,8 +41,14 @@ public sealed class CorsSettings : SettingsBase<CorsSettings>, ISettingsSection
     /// <summary>The methods allowed when <see cref="AllowedMethods"/> is not configured.</summary>
     public static IReadOnlyList<string> DefaultAllowedMethods { get; } = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"];
 
-    /// <summary>Whether to allow cookies/credentials on cross-origin requests. Incompatible with a <c>"*"</c> origin — see <see cref="CorsSettingsValidator"/>.</summary>
-    public bool AllowCredentials { get; init; } = true;
+    /// <summary>
+    /// Whether browsers may send cookies, HTTP auth or client certificates on cross-origin
+    /// requests. <see langword="false"/> by default: a bearer token is set explicitly by the
+    /// caller's code and doesn't need it, and turning it on lets every allowed origin make
+    /// cookie-carrying requests on a signed-in user's behalf. Enable it deliberately, alongside
+    /// cookie authentication. Incompatible with a <c>"*"</c> origin — see <see cref="CorsSettingsValidator"/>.
+    /// </summary>
+    public bool AllowCredentials { get; init; }
 
     /// <summary>How long, in seconds, a browser may cache a preflight response.</summary>
     [Range(0, int.MaxValue)]

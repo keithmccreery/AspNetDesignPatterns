@@ -114,7 +114,7 @@ public class CorsExtensionsTests
     }
 
     [Test]
-    public void Defaults_to_any_header_and_the_common_methods_when_none_are_configured()
+    public void Defaults_to_any_header_the_common_methods_and_no_credentials()
     {
         // Arrange & Act
         CorsPolicy policy = BuildPolicy(new CorsSettings { AllowedOrigins = ["https://app.example.com"] });
@@ -124,6 +124,7 @@ public class CorsExtensionsTests
         {
             policy.AllowAnyHeader.Should().BeTrue();
             policy.Methods.Should().Equal(CorsSettings.DefaultAllowedMethods);
+            policy.SupportsCredentials.Should().BeFalse("bearer-token APIs don't need credentials mode; opt in deliberately");
         }
     }
 

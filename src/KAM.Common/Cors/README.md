@@ -9,7 +9,7 @@ applied to a smaller, self-contained concern.
   "AllowedOrigins": [ "http://localhost:5173" ],
   "AllowedHeaders": [ "*" ],
   "AllowedMethods": [ "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH" ],
-  "AllowCredentials": true,
+  "AllowCredentials": false,
   "MaxAgeSeconds": 3600
 }
 ```
@@ -40,6 +40,15 @@ headers would still contain the default `"*"`, i.e. any header. Config could nev
 policy. So both properties default to empty, and `AddCorsPolicy()` treats empty as "not
 configured": any header, and `CorsSettings.DefaultAllowedMethods`. The same trap applies to any
 `SettingsBase<T>` collection with a non-empty initializer — keep collection defaults empty.
+
+## Why `AllowCredentials` defaults to `false`
+
+"Credentials" in CORS means cookies, HTTP auth and TLS client certificates — things the browser
+attaches *automatically*. This API authenticates with a bearer token, which the caller's code
+sets explicitly in the `Authorization` header, so it works without credentials mode. Turning it
+on anyway is latent risk: the moment cookie authentication is added, every origin in
+`AllowedOrigins` can make cookie-carrying requests on a signed-in user's behalf. So it's off by
+default; switch it on in config deliberately, alongside cookie auth.
 
 ## Why a `"*"` origin can't have credentials
 
