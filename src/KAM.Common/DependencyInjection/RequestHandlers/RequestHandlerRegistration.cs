@@ -1,7 +1,6 @@
 using System.Reflection;
 
 using KAM.Common.DependencyInjection;
-using KAM.Common.Handlers;
 
 using Microsoft.Extensions.DependencyInjection.Extensions;
 

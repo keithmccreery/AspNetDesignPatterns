@@ -71,4 +71,15 @@ public class SqlScriptMigratorTests
         _database.Scalar<string>("SELECT group_concat(script) FROM schema_versions;").Should().Be("001_create.sql");
         _database.Scalar<int>("SELECT COUNT(*) FROM sqlite_master WHERE name = 'half_done';").Should().Be(0);
     }
+
+    [Test]
+    public void A_blank_resource_prefix_is_rejected_at_the_call_not_when_awaited()
+    {
+        // Arrange — the task is discarded, never awaited: only an eager throw can fail this test
+        using SqliteConnection connection = new(_database.ConnectionString);
+        Action act = () => _ = SqlScriptMigrator.ApplyAsync(connection, ScriptAssembly, " ", TimeProvider.System, CancellationToken.None);
+
+        // Act & Assert
+        act.Should().Throw<ArgumentException>().WithParameterName("resourcePrefix");
+    }
 }

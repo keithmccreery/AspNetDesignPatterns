@@ -1,4 +1,4 @@
-using KAM.Common.Handlers;
+using KAM.Common.DependencyInjection;
 using KAM.Common.Results;
 
 using Microsoft.Extensions.DependencyInjection;

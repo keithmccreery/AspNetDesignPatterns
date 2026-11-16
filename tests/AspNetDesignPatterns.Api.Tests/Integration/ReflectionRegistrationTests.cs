@@ -5,7 +5,6 @@ using FluentValidation;
 
 using KAM.Common.Data;
 using KAM.Common.DependencyInjection;
-using KAM.Common.Handlers;
 using KAM.Common.Pagination;
 using KAM.Common.Pipeline;
 

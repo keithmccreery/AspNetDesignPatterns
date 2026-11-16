@@ -1,4 +1,4 @@
-using KAM.Common.Handlers;
+using KAM.Common.DependencyInjection;
 using KAM.Common.Pipeline;
 
 namespace AspNetDesignPatterns.Api.Features.Weather;

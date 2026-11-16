@@ -46,8 +46,11 @@ public class Result
     /// <remarks>
     /// Declare the handler's parameter type and both type arguments are inferred:
     /// <c>Result.TryAsync(work, (DbException ex) =&gt; Errors.DatabaseUnavailable.WithException(ex))</c>.
+    /// Not <c>async</c> itself, so a null argument throws at the call rather than when the task is
+    /// awaited (ErrorProne.NET EPC37); the awaiting happens in the <c>static</c> local function,
+    /// which nothing else can call.
     /// </remarks>
-    public static async Task<Result<T>> TryAsync<T, TException>(
+    public static Task<Result<T>> TryAsync<T, TException>(
         Func<Task<Result<T>>> work,
         Func<TException, Error> onException)
         where TException : Exception
@@ -55,18 +58,24 @@ public class Result
         ArgumentNullException.ThrowIfNull(work);
         ArgumentNullException.ThrowIfNull(onException);
 
-        try
+        return TryCoreAsync(work, onException);
+
+        // A static local function: only this method can call it, and it can use only what is passed in.
+        static async Task<Result<T>> TryCoreAsync(Func<Task<Result<T>>> work, Func<TException, Error> onException)
         {
-            return await work();
-        }
-        catch (TException ex)
-        {
-            return Failure<T>(onException(ex));
+            try
+            {
+                return await work();
+            }
+            catch (TException ex)
+            {
+                return Failure<T>(onException(ex));
+            }
         }
     }
 
     /// <inheritdoc cref="TryAsync{T, TException}"/>
-    public static async Task<Result> TryAsync<TException>(
+    public static Task<Result> TryAsync<TException>(
         Func<Task<Result>> work,
         Func<TException, Error> onException)
         where TException : Exception
@@ -74,13 +83,19 @@ public class Result
         ArgumentNullException.ThrowIfNull(work);
         ArgumentNullException.ThrowIfNull(onException);
 
-        try
+        return TryCoreAsync(work, onException);
+
+        // A static local function: only this method can call it, and it can use only what is passed in.
+        static async Task<Result> TryCoreAsync(Func<Task<Result>> work, Func<TException, Error> onException)
         {
-            return await work();
-        }
-        catch (TException ex)
-        {
-            return Failure(onException(ex));
+            try
+            {
+                return await work();
+            }
+            catch (TException ex)
+            {
+                return Failure(onException(ex));
+            }
         }
     }
 

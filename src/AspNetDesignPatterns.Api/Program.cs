@@ -73,6 +73,9 @@ builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = 
 // Minimal API instance, and that *same instance* is what anything injecting
 // JsonSerializerOptions (typed clients, the health-check writer) receives -- no second copy to
 // keep in sync, so a setting added in ConfigureJsonSerializer() can't silently miss one side.
+// Need it later in this file? Resolve it: app.Services.GetRequiredService<JsonSerializerOptions>()
+// after Build(), or from the IServiceProvider overload of a registration before it. Never `new`
+// one here: HttpJsonOptions.SerializerOptions can't be replaced, so a new instance is a copy.
 builder.Services.ConfigureHttpJsonOptions(options => ConfigureJsonSerializer(options.SerializerOptions));
 builder.Services.AddSingleton(services => services.GetRequiredService<IOptions<HttpJsonOptions>>().Value.SerializerOptions);
 

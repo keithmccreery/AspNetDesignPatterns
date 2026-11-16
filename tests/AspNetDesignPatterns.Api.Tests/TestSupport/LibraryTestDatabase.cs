@@ -3,7 +3,7 @@ using System.Data.Common;
 using AspNetDesignPatterns.Api.Features.Library;
 
 using KAM.Common.Data;
-using KAM.Common.Handlers;
+using KAM.Common.DependencyInjection;
 using KAM.Common.Results;
 
 using Microsoft.Data.Sqlite;
