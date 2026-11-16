@@ -70,11 +70,11 @@ nothing else to register. Inject `IOptions<WeatherOptions>` wherever it's needed
 `SettingsBase<T>` is constrained `where T : SettingsBase<T>, ISettingsSection`, and
 `ISettingsSection.Section` is `static abstract`. So:
 
-| Mistake | Before | Now |
-|---|---|---|
-| Forgot `Section` | startup exception (reflection lookup) | **build error** (CS0311: `T` doesn't implement `ISettingsSection`) |
-| `class FooOptions : SettingsBase<BarOptions>` (copy-paste) | silently registered `BarOptions` | startup exception (it compiles when `BarOptions` is itself valid, so `RegisterSettings` checks) |
-| `Section => ""` | startup exception | startup exception (only the *value* can still be wrong) |
+- **No `Section`** is a build error (CS0311: `T` doesn't implement `ISettingsSection`).
+- **The wrong `T`** — `class FooOptions : SettingsBase<BarOptions>`, a copy-paste slip — fails
+  at startup. It still compiles when `BarOptions` is itself a valid settings class, so
+  `RegisterSettings` checks that `T` is the class itself.
+- **An empty `Section`** (`Section => ""`) fails at startup.
 
 `ISettingsSection` is separate from `ISettings` because an abstract base class can't satisfy
 a `static abstract` member for its subclasses — so each concrete settings class declares it.
@@ -113,10 +113,8 @@ public sealed class JwtOptions : SettingsBase<JwtOptions>, ISettingsSection
 ```
 
 The choice is made **when validation runs** (after the container is built), not when
-`AddSettings()` runs — so it no longer matters whether validators are registered before or
-after the settings. (It used to: registering validators afterwards silently fell back to
-DataAnnotations, which for a FluentValidation-only class means *no* validation at all. That
-ordering rule is gone; `SettingsBaseTests` pins it.) Prefer FluentValidation once a rule spans
+`AddSettings()` runs — by then every validator is registered, so validators and settings can
+be registered in either order (`SettingsBaseTests` covers both). Prefer FluentValidation once a rule spans
 properties (`TotalRequestTimeout > AttemptTimeout`) or needs more than an attribute can say.
 
 ### Collection properties: default to empty

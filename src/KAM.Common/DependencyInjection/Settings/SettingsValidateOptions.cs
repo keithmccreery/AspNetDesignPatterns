@@ -12,8 +12,7 @@ namespace KAM.Common.DependencyInjection;
 /// <remarks>
 /// The choice is made here, at validation time, rather than when <c>AddSettings()</c> runs: by
 /// the time <c>ValidateOnStart</c> validates, the container is built and every validator is
-/// registered, whatever order <c>Program.cs</c> called things in. (Deciding at registration time
-/// silently fell back to DataAnnotations when validators were registered after the settings.)
+/// registered, whatever order <c>Program.cs</c> called things in.
 /// </remarks>
 internal sealed class SettingsValidateOptions<TOptions> : IValidateOptions<TOptions>
     where TOptions : class

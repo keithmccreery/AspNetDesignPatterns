@@ -9,7 +9,7 @@ namespace KAM.Common.DependencyInjection;
 /// <remarks>
 /// A separate interface rather than a member of <see cref="ISettings"/>: an abstract base class
 /// can't satisfy a <c>static abstract</c> member on behalf of its subclasses, so
-/// <see cref="SettingsBase{T}"/> could no longer implement <see cref="ISettings"/>.
+/// <see cref="SettingsBase{T}"/> couldn't implement <see cref="ISettings"/>.
 /// </remarks>
 public interface ISettingsSection
 {
