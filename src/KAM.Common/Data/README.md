@@ -25,15 +25,17 @@ DbConnection connection = await _unitOfWork.GetConnectionAsync(cancellationToken
 await connection.ExecuteAsync(new CommandDefinition(sql, parameters, _unitOfWork.Transaction, cancellationToken: cancellationToken));
 ```
 
-The use case (here a handler) draws the transaction boundary (simplified from `BorrowBookHandler`):
+The service draws the transaction boundary (simplified from `LibraryService.BorrowBookAsync`):
 
 ```csharp
-return await _unitOfWork.ExecuteInTransactionAsync<LoanResponse>(async token =>
-{
-    if (!await _repository.TryTakeCopyAsync(bookId, token)) return LibraryErrors.NoCopiesAvailable;
-    if (await _repository.HasOpenLoanAsync(bookId, member, token)) return LibraryErrors.AlreadyBorrowed; // rolls back the copy taken above
-    return LoanResponse.From(await _repository.InsertLoanAsync(bookId, member, now, due, token));
-}, cancellationToken);
+return Result.TryAsync(
+    () => _unitOfWork.ExecuteInTransactionAsync<LoanRow>(async token =>
+    {
+        if (!await _repository.TryTakeCopyAsync(bookId, token)) return LibraryErrors.NoCopiesAvailable;
+        if (await _repository.HasOpenLoanAsync(bookId, member, token)) return LibraryErrors.AlreadyBorrowed; // rolls back the copy taken above
+        return await _repository.InsertLoanAsync(bookId, member, now, due, token);
+    }, cancellationToken),
+    (DbException ex) => LibraryErrors.DatabaseUnavailable.WithException(ex));
 ```
 
 The outcome decides the transaction:
@@ -42,11 +44,13 @@ The outcome decides the transaction:
 |---|---|
 | returns a successful `Result` | committed |
 | returns a failed `Result` (404, 409, …) | rolled back; the failure is returned |
-| throws | rolled back (by disposing it); the exception propagates to the caller's `catch (DbException)` |
+| throws | rolled back (by disposing it); the exception propagates, to the service's `Result.TryAsync` |
 
 So a business rule that fails after a write needs no compensating code: returning the `Error`
 undoes the write. And because the result decides, it composes with the rest of `Results/` —
-the handler returns the same `Result<T>` either way.
+the service returns the same `Result<T>` either way. `Result.TryAsync` wraps the whole call, not
+just the repository calls inside it, because the unit of work throws too: opening the
+connection, `BEGIN`, `COMMIT`.
 
 **Nested calls join the outer transaction.** A call made inside `work` runs in the same
 transaction; only the outermost call commits or rolls back. There are no savepoints: an inner

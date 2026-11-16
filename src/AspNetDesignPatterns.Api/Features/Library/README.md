@@ -28,14 +28,15 @@ carry both (`Jwt:DevTokenScopes`).
 | `ListBooksRequest.cs`, `ListLoansRequest.cs` | Paged requests (`ICursorPagedRequest`), their cursor keys (`BookCursor`, `LoanCursor`) and validators (`Include` the shared paging rules). |
 | `LibraryRequests.cs` | The single-resource requests. No validators: an id that matches nothing is already a 404. |
 | `MemberId.cs` | The caller, from the token's `sub` claim — bound into request records by `BindAsync`, so handlers never see a `ClaimsPrincipal`. |
-| `*Handler.cs` (6) | The use cases. Each owns its logic directly (no service layer — see below), catches `DbException` → `LibraryErrors.DatabaseUnavailable`. `BorrowBookHandler` and `ReturnLoanHandler` run in a transaction. |
-| `ILibraryRepository.cs` | The slice's "client" layer, the counterpart of `IWeatherClient`: what handlers depend on, plus the `BookRow` / `LoanRow` it returns. No business rules; may throw `DbException`. |
+| `*Handler.cs` (6) | The use cases, as seen by the API: call `ILibraryService`, map rows to responses, and (for the lists) own the paging contract — decode the cursor, ask for `limit + 1`, build the next cursor. No exception handling, no SQL, no transactions. |
+| `ILibraryService.cs`, `LibraryService.cs` | The service layer, the counterpart of `IWeatherService`: business rules, the order of repository calls, the transaction boundary (`ExecuteInTransactionAsync`), and `DbException` → `LibraryErrors.DatabaseUnavailable` via `Result.TryAsync`. Returns `Result<BookRow/LoanRow>`. |
+| `ILibraryRepository.cs` | The gateway, the counterpart of `IWeatherClient`: one database operation per method, plus the `BookRow` / `LoanRow` it returns. No business rules; may throw `DbException`. |
 | `LibraryRepository.cs` | The implementation: every SQL statement in the slice, Dapper over `IUnitOfWork`. |
 | `BookResponse.cs`, `LoanResponse.cs` | The API contract, mapped from rows. |
 | `LibraryErrors.cs` | Every `Error` the slice returns. |
 | `LibraryAuthorization.cs` | `LibraryPolicies` / `LibraryScopes`. |
 | `LibraryOptions.cs` | `ConnectionString`, `DefaultPageSize` (20), `MaxPageSize` (100), `LoanPeriod` (14 days) + validator. |
-| `LibraryDependencies.cs` | `IDependency`: connection factory, `AddUnitOfWork()`, `ILibraryRepository` → `LibraryRepository`, Dapper type handler, migrations, health check. |
+| `LibraryDependencies.cs` | `IDependency`: connection factory, `AddUnitOfWork()`, `ILibraryService` → `LibraryService`, `ILibraryRepository` → `LibraryRepository`, Dapper type handler, migrations, health check. |
 | `SqliteConnectionFactory.cs` | The app's `IDbConnectionFactory`; resolves a relative `Data Source` against the content root. |
 | `DateTimeOffsetTypeHandler.cs` | Dapper ↔ ISO-8601 UTC text, since SQLite has no date type. |
 | `LibraryDatabaseInitializer.cs` | `IHostedService` that runs `SqlScriptMigrator` on `Schema/*.sql` before the server starts listening. |
@@ -50,7 +51,10 @@ POST /api/v1/library/books/9/loans   (Bearer token, sub = "alice")
   ├─ [AsParameters] BorrowBookRequest(BookId: 9, Member: MemberId.BindAsync → "alice")
   ├─ RequireAuthorization(LibraryWrite)  → 401 / 403
   ▼
-BorrowBookHandler
+BorrowBookHandler           → ILibraryService.BorrowBookAsync(9, alice), then LoanRow → LoanResponse
+  ▼
+LibraryService.BorrowBookAsync
+  │  Result.TryAsync(…, (DbException ex) → 500 Library.DatabaseUnavailable, exception attached for the log)
   │  unitOfWork.ExecuteInTransactionAsync(…)   BEGIN IMMEDIATE (SQLite's write lock)
   │    1. TryTakeCopyAsync      UPDATE books SET available_copies = available_copies - 1
   │                             WHERE id = 9 AND available_copies > 0
@@ -60,7 +64,6 @@ BorrowBookHandler
   │    2. HasOpenLoanAsync      → 409 AlreadyBorrowed: ROLLBACK puts step 1's copy back
   │    3. InsertLoanAsync       INSERT … RETURNING id
   │  success → COMMIT
-  │  catch (DbException) → 500 Library.DatabaseUnavailable (with the exception attached for the log)
   ▼
 .LogOnFailureAsync(logger) → .ToHttpResultAsync(loan => CreatedAtRoute("GetLibraryLoan", { loanId }))
   → 201 Created, Location: /api/v1/library/loans/{id}
@@ -74,9 +77,13 @@ undo — which is exactly what the unit of work does, with no compensating code.
 partial index `ux_loans_open_per_member_book` is the backstop that makes a duplicate open loan
 impossible, not just unlikely.
 
-`ReturnLoanHandler` is the same shape: load the caller's loan (404 if missing or someone
-else's — no hint that the id exists), 409 if already returned, then close the loan and put the
-copy back in one transaction.
+`ReturnLoanAsync` is the same shape: load the caller's loan (404 if missing or someone
+else's — no hint that the id exists), 409 if already returned, then `CloseLoanAsync` and
+`ReturnCopyAsync` — two writes to two tables, in one transaction.
+
+`Result.TryAsync` wraps the transaction, not just the repository calls, on purpose: the unit of
+work throws too (opening the connection, `BEGIN IMMEDIATE` timing out on the write lock,
+`COMMIT`), and those failures happen outside any repository method.
 
 ## Paging
 
@@ -107,44 +114,60 @@ SQLite's FTS5 (or the database's full-text search) is the next step.
   run. Delete it to start over.
 - **Moving to PostgreSQL** means a new `IDbConnectionFactory` (Npgsql) and the SQL dialect
   (`ILIKE`, identity columns, `timestamptz` instead of the type handler); `IUnitOfWork`,
-  `SqlScriptMigrator`, the handlers and the paging code don't change. A hosted database's
-  connection string is a secret: it would come from `.env`, like `Jwt__SigningKey`.
+  `SqlScriptMigrator`, the service, the handlers and the paging code don't change. A hosted
+  database's connection string is a secret: it would come from `.env`, like `Jwt__SigningKey`.
 
-## Not every slice needs every layer
+## Layers
 
-`Weather` has endpoint → handler → pipeline → service → client. This slice has
-endpoint → handler → `ILibraryRepository`: no pipeline (nothing to compose) and **no service**, because
-each use case is used by exactly one handler. The handler owns the use case, including the
-transaction and the `DbException` → `Error` translation that `WeatherService` does for
-`Weather`. If several handlers ever need the same rule, that's the moment to extract a
-service. "Only the client layer throws" still holds: the repository throws (via Dapper), the
-handlers catch.
+The same layers as `Weather`, minus the pipeline (nothing to compose):
 
-### Why an interface, if the tests use the real repository?
+| Layer | Here | Owns |
+|---|---|---|
+| Endpoint | `BorrowBookEndpoint`, … | HTTP: binding, auth, validation, `201 Created` |
+| Handler | `BorrowBookHandler`, … | the API's view: rows → responses, the paging contract |
+| Service | `ILibraryService` → `LibraryService` | the rules, the order of calls, the transaction, `DbException` → `Error` |
+| Gateway | `ILibraryRepository` → `LibraryRepository` | one database operation per method; may throw |
 
-Handlers depend on `ILibraryRepository` for the same reason they'd depend on any other
-service's interface: consistent DI (`AddScoped<ILibraryRepository, LibraryRepository>()`, like
-`IWeatherClient`), and the handler's dependencies read as contracts, not SQL. It isn't there to
-be mocked: the handler tests run the real `LibraryRepository` on in-memory SQLite, because the
-conditional `UPDATE`, the rollback and the unique index are the behavior under test, and a
-substitute would fake them away.
+Several service methods are pass-throughs today (`GetBookAsync` is a repository call plus
+"null means 404"). They still go through the service, because the service is where exceptions
+stop: an architecture test keeps handlers off the repository and `IUnitOfWork`, so a handler
+can't forget a catch. When a use case grows (borrowing, returning), the new logic goes into
+the service.
+
+**One operation per repository method** is what keeps the line between gateway and service
+clear. `TryTakeCopyAsync` is one conditional `UPDATE`; `InsertLoanAsync` is an `INSERT` plus a
+read-back of the row it wrote. Returning a loan touches two tables, so it's two methods
+(`CloseLoanAsync`, `ReturnCopyAsync`) that the service sequences inside its transaction.
+
+### Why interfaces, if the tests use the real repository?
+
+Consistent DI (`AddScoped<ILibraryService, LibraryService>()`, like `IWeatherService` and
+`IWeatherClient`), and dependencies that read as contracts. They also split the tests by what
+each layer owns: `LibraryServiceTests` run the real service and repository on in-memory SQLite,
+because the conditional `UPDATE`, the rollback and the unique index are the behavior under
+test and a substitute would fake them away. `LibraryHandlerTests` substitute `ILibraryService`,
+because mapping and cursor handling don't need a database.
 
 ## Tests
 
-`tests/AspNetDesignPatterns.Api.Tests/Features/Library/` — handlers run against a real
+`tests/AspNetDesignPatterns.Api.Tests/Features/Library/` — the database tests use a real
 in-memory database with this slice's schema, wired by the real `LibraryDependencies`
-(`TestSupport/LibraryTestDatabase`, one DI scope per call, like a request):
+(`TestSupport/LibraryTestDatabase`; `CallAsync` for the service, `SendAsync` for a handler, each
+in its own DI scope, like a request):
 
-- `ListBooksHandlerTests` — first page + cursor; following cursors visits every book once
-  (equal titles across a page boundary); an insert behind the cursor doesn't shift the next
-  page; search on title or author, case-insensitive, with `%` taken literally; database
-  failure → `DatabaseUnavailable`.
-- `BorrowBookHandlerTests` — success (copy taken, due date from `LoanPeriod`); unknown book;
-  no copy left (nothing changes); borrowing twice rolls back the copy it took; holding the last
-  copy yourself is `AlreadyBorrowed`; database failure.
-- `ReturnLoanHandlerTests` — return puts the copy back; returning twice; someone else's loan
-  is `LoanNotFound`; unknown loan.
-- `LibraryQueryHandlerTests` — get book, get loan (own vs other), loans paged newest first.
+- `LibraryServiceTests` — borrow: success (copy taken, due date from `LoanPeriod`), unknown
+  book, no copy left (nothing changes), borrowing twice rolls back the copy it took, holding the
+  last copy yourself is `AlreadyBorrowed`; return: puts the copy back, returning twice, someone
+  else's loan is `LoanNotFound`, unknown loan; get book / get loan (own vs other); a database
+  failure on a read and on opening a transaction → `DatabaseUnavailable`.
+- `LibraryHandlerTests` — with a substitute `ILibraryService`: row → response mapping, a
+  failure passed through unchanged, `limit + 1` turned into the next cursor, a decoded cursor
+  handed to the service.
+- `ListBooksHandlerTests` — paging and search end to end: first page + cursor; following
+  cursors visits every book once (equal titles across a page boundary); an insert behind the
+  cursor doesn't shift the next page; search on title or author, case-insensitive, with `%`
+  taken literally.
+- `ListLoansHandlerTests` — the caller's loans paged newest first, end to end.
 - `LibraryRequestValidatorTests` — configured max page size, a loan cursor rejected by the
   book list, search length.
 - `LibraryInfrastructureTests` — `MemberId` binding with and without `sub`, data-source path

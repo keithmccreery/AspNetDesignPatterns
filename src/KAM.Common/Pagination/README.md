@@ -42,8 +42,8 @@ Include(new CursorPagedRequestValidator<BookCursor>(options.Value.MaxPageSize));
 // The handler
 int limit = request.EffectiveLimit(_options.DefaultPageSize);
 CursorCodec.TryDecode(request.Cursor, out BookCursor? after);   // null → first page
-IReadOnlyList<BookRow> rows = await _repository.ListBooksAsync(request.Search, after, limit + 1, ct);
-return CursorPage.From(rows, limit, row => new BookCursor(row.Title, row.Id)).Map(BookResponse.From);
+return _library.ListBooksAsync(request.Search, after, limit + 1, ct)   // Result<IReadOnlyList<BookRow>>
+    .MapAsync(rows => CursorPage.From(rows, limit, row => new BookCursor(row.Title, row.Id)).Map(BookResponse.From));
 ```
 
 ## Cursor vs offset

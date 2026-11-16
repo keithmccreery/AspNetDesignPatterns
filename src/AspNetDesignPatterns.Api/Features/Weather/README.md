@@ -16,14 +16,14 @@ copy this folder's shape when adding a feature.
 | `GetForecastHandler.cs` | `IRequestHandler` — composes and runs the pipeline via `IPipelineFactory`. |
 | `ForecastPipeline.cs` | `ForecastContext` + the middleware steps (fetch → round). |
 | `WeatherErrors.cs` | Every `Error` the slice returns (`ProviderUnavailable` → 502, `NoResponse` → 500), defined once: the codes are API contract, matched by clients, logs and tests. |
-| `WeatherService.cs` | First layer above the client: turns values / exceptions into `Result<T>`; maps upstream → contract. |
-| `IWeatherClient.cs` | Client abstraction + `WeatherClientException`. The only layer allowed to throw. |
+| `IWeatherService.cs`, `WeatherService.cs` | The service layer, first above the client: maps upstream → contract, and turns a `WeatherClientException` into `WeatherErrors.ProviderUnavailable` with `Result.TryAsync`. |
+| `IWeatherClient.cs` | The gateway: client abstraction + `WeatherClientException`. The only layer allowed to throw. |
 | `OpenMeteoWeatherClient.cs` | Typed `HttpClient` implementation (resilience is applied globally). Builds the query with `QueryHelpers.AddQueryString` (URL-encoded, culture-invariant) and validates the daily-forecast shape before returning it, so a malformed-but-parseable payload becomes a `WeatherClientException`, not an unhandled exception three layers up. |
 | `OpenMeteoForecast.cs` | The upstream JSON shape (client boundary only). |
 | `WeatherOptions.cs` | `SettingsBase<WeatherOptions>` — binds the `Weather` section + FluentValidation validator. |
 | `WeatherProviderHealthCheck.cs` | `IHealthCheck` — readiness probe for open-meteo. Reports `Degraded` (not `Unhealthy`) when it's down, since the endpoint degrades to a 502. |
 | `WeatherAuthorization.cs` | `WeatherPolicies.Read` (the policy *name* the endpoint requires) and `WeatherScopes.Read` (the scope *value* its config checks) — the slice owns its authorization vocabulary, not `KAM.Common`. |
-| `WeatherDependencies.cs` | `IDependency` — registers `WeatherService`, the typed client, the health-check client (resilience removed), and the `ready`-tagged check. |
+| `WeatherDependencies.cs` | `IDependency` — registers `IWeatherService` → `WeatherService`, the typed client, the health-check client (resilience removed), and the `ready`-tagged check. |
 
 ## Request flow
 
@@ -41,12 +41,12 @@ IRequestHandler<GetForecastRequest, ForecastResponse>  =  GetForecastHandler
   │              .Use<RoundTemperaturesStep>()
   ▼
 Pipeline<ForecastContext>.ExecuteAsync   ← Shared/Pipeline  (middleware: each step gets `next`)
-  ├─ FetchForecastStep         → calls WeatherService; on success sets context.Response, calls `next`
+  ├─ FetchForecastStep         → calls IWeatherService; on success sets context.Response, calls `next`
   │      │
   │      ▼
   │   WeatherService  ──────────────────── returns Result<ForecastResponse>  (takes no ILogger)
-  │      │                                 catches WeatherClientException →
-  │      │                                 Error.Upstream(...).WithException(ex).WithContext(coords)
+  │      │                                 Result.TryAsync: WeatherClientException →
+  │      │                                 WeatherErrors.ProviderUnavailable.WithException(ex).WithContext(coords)
   │      ▼
   │   IWeatherClient  =  OpenMeteoWeatherClient   ← typed HttpClient + Polly (global default)
   │      │                                          may throw WeatherClientException

@@ -59,7 +59,8 @@ Optional: `docker compose up -d` runs a local OTLP collector (.NET Aspire Dashbo
   its README for why it's named `KAM.Common` and not something tied to the sample app). `Api`
   takes a `ProjectReference` on `KAM.Common`; never the other way round.
 - **Vertical slices** under `Features/<Name>/` (in `AspNetDesignPatterns.Api`) — each owns its
-  endpoint, request+validator, response DTO, handler, service, client, options, pipeline steps.
+  endpoint, request+validator, response DTO, handler, service, client or repository, options,
+  pipeline steps.
 - **Cross-cutting building blocks** (in `KAM.Common`) — one top-level folder per concern
   (`Results/`, `Pipeline/`, `Authentication/`, `Authorization/`, `Cors/`, `HealthChecks/`,
   `OpenApi/`, `Logging/`, `FluentValidations/`, `Configuration/`, `Handlers/`, `Telemetry/`,
@@ -91,22 +92,30 @@ Optional: `docker compose up -d` runs a local OTLP collector (.NET Aspire Dashbo
   settings/endpoint/handler/dependency/step in the assembly *not* passed is never discovered,
   with no error at startup) — extend the array in `Program.cs`, don't rely on the default,
   if a third assembly is ever added.
-- **Request flow**: endpoint (thin HTTP adapter) → `IRequestHandler<TReq,TRes>` → optional
-  `Pipeline<TContext>` → service (returns `Result<T>`) → typed client (may throw). For a
-  database the "client" is an `I…Repository` (implemented with Dapper over `IUnitOfWork`),
-  and a slice may skip the pipeline and service layers when it has nothing for them to do —
-  `Library` is endpoint → handler → `ILibraryRepository`, with the handler drawing the
-  transaction boundary.
+- **Request flow and layer names** — the same four layers in every slice, named by role:
+
+  | Layer | Name | Returns | Owns |
+  |---|---|---|---|
+  | Endpoint | `<Verb><Noun>Endpoint` | `IResult` | HTTP binding, auth, validation |
+  | Handler | `<Verb><Noun>Handler` (`IRequestHandler<TReq,TRes>`) | `Result<TResponse>` | the use case: maps to response DTOs, cursors, an optional `Pipeline<TContext>` |
+  | Service | `I<Name>Service` / `<Name>Service` | `Result<T>` | business rules, the order of gateway calls, the transaction (`IUnitOfWork`), gateway exception → `Error` |
+  | Gateway | `I<Name>Client` (HTTP/SDK) or `I<Name>Repository` (database) | plain values / `null` | one external call or one database operation per method; **may throw** |
+
+  `Weather` is endpoint → handler → pipeline → `IWeatherService` → `IWeatherClient`; `Library`
+  is endpoint → handler → `ILibraryService` → `ILibraryRepository` (Dapper over `IUnitOfWork`).
+  A service method may be a pass-through; it still exists, because it's where exceptions stop.
+  Handlers and pipeline steps never touch a client, repository or `IUnitOfWork` (enforced by
+  an architecture test).
 - **`Program.cs`** is a deliberately flat, banner-organized composition root — **do not**
   extract it into `AddApiServices()` helpers. Feature/Shared registration is already
   factored out into the reflection scans.
 
 ## Non-negotiable conventions
 
-1. **`Result` / `Result<T>` above the client layer.** Services and handlers never throw
-   upward; they catch client exceptions and return `Error.Upstream(...).WithException(ex)`.
-   Only the client (HttpClient/DB/SDK — a `…Repository` for a database) throws. See
-   `KAM.Common/Results/README.md`.
+1. **`Result` / `Result<T>` above the gateway layer.** Only a `…Client` or `…Repository`
+   throws. The service catches what its gateway throws with `Result.TryAsync(work, (TException
+   ex) => <Name>Errors.X.WithException(ex))` — one place per service, not a try/catch per method —
+   so handlers never see an exception. See `KAM.Common/Results/README.md`.
 2. **Endpoints return `ProblemDetails`** via `result.ToHttpResult()` — never a bespoke error
    shape.
 3. **Each feature defines its errors once, in `Features/<Name>/<Name>Errors.cs`** — an
@@ -213,6 +222,7 @@ same block also silences the XML-doc completeness/style family (`RCS1141`, `SA16
 
 ## When adding a feature
 
-Copy the shape of `Features/Weather/` and its README. Add the 6 pieces (request+validator,
-response, handler, endpoint, `<Name>Errors`, and — if needed — `IDependency` /
+Copy the shape of `Features/Weather/` (external API) or `Features/Library/` (database) and its
+README. Add the pieces (request+validator, response, handler, endpoint, `<Name>Errors`,
+`I<Name>Service` + gateway, an `IDependency` registering them, and — if needed —
 `SettingsBase<T>` / pipeline steps), plus a matching test folder. Nothing else to wire.

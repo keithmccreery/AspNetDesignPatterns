@@ -6,9 +6,9 @@ The conventions in `CLAUDE.md` and the `Shared/` / `Features/` READMEs, enforced
 
 | File | Rules |
 |---|---|
-| `ResultPatternTests.cs` | `*Service` types and `IRequestHandler<,>` implementations return `Result` from every public method; services and handlers never `throw new`; only `*Client` types raise the feature exceptions. A `*Repository` (Library) never needs `throw new`: its database exceptions come from Dapper/ADO.NET, and its handler catches them. |
+| `ResultPatternTests.cs` | `*Service` types and `IRequestHandler<,>` implementations return `Result` from every public method; services and handlers never `throw new`; only `*Client` types raise the feature exceptions. A `*Repository` (Library) never needs `throw new`: its database exceptions come from Dapper/ADO.NET, and its service catches them. |
 | `VerticalSliceTests.cs` | No feature depends on another feature. ("`Shared/`/`DependencyInjection/` never depend on a feature" used to be two more rules here — see "When a rule is wrong" below for why they're gone.) |
-| `ConventionTests.cs` | Role types are named for their role (`…Endpoint`, `…Handler`, `…Step`, `…Options`, `…Validator`, `…HealthCheck`, `…Dependencies`) and sealed; endpoints don't reach past the handler into a service, client or repository. |
+| `ConventionTests.cs` | Role types are named for their role (`…Endpoint`, `…Handler`, `…Step`, `…Options`, `…Validator`, `…HealthCheck`, `…Dependencies`) and sealed; endpoints don't reach past the handler into a service, client or repository; handlers and pipeline steps don't reach past the service into a client, repository or `KAM.Common.Data` (`IUnitOfWork`), so the service is the only place a gateway exception can be caught. |
 | `SanityTests.cs` | Guards against a rule passing **vacuously** — every predicate the other fixtures rely on is asserted to match at least one real type. |
 
 Everything in this folder scans `AspNetDesignPatterns.Api` only (see `ArchitectureRules.cs`)
@@ -30,7 +30,7 @@ same idea for the Production/Development gating on the OpenAPI document and Scal
   only reports pass/fail).
 - `CustomRules.cs` — NetArchTest is type-level; these `ICustomRule` implementations read
   method signatures and IL for the rules that are about behaviour (returns `Result`, contains
-  no `throw new`, depends on a `*Service`/`*Client`/`*Repository`). They skip compiler-generated
+  no `throw new`, references a type from a given layer). They skip compiler-generated
   members and fold in async state machines so an `async` method's `throw new` is still seen.
   "Throws" means a `throw` of a just-constructed object: the compiler's lowering of
   `await using`, and of `await` inside a `catch`, rethrows a captured exception with the same
