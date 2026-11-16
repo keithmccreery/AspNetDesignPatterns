@@ -23,6 +23,14 @@
     <PackageReference Include="Microsoft.AspNetCore.TestHost" />
     <PackageReference Include="Asp.Versioning.Http" />
     <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" />
+    <!-- Data/ is provider-agnostic ADO.NET; its tests run it against a real (in-memory) SQLite
+         database rather than mocking DbConnection/DbTransaction. -->
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Fixture scripts for SqlScriptMigratorTests (the .txt next to them must be ignored by it). -->
+    <EmbeddedResource Include="Data\Scripts\**\*.sql;Data\Scripts\**\*.txt" />
   </ItemGroup>
 
   <ItemGroup>
