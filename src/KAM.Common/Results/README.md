@@ -8,8 +8,8 @@ the outcome instead of throwing.
 ```
 Endpoint    → returns IResult        (result.ToHttpResult())          — never throws
 Handler     → returns Result<T>      (orchestration / pipeline)       — never throws
-Service     → returns Result<T>      (maps upstream → contract)       — never throws; CATCHES client exceptions
-Client      → returns T (or throws)  (HttpClient, DB, SDK)            — MAY throw; this is the only layer that does
+Service     → returns Result<T>      (business rules, transactions)   — never throws; CATCHES gateway exceptions (Result.TryAsync)
+Gateway     → returns T (or throws)  (…Client: HTTP/SDK; …Repository: database) — MAY throw; this is the only layer that does
 ```
 
 A `Result` is for **expected** failure paths (not found, conflict, upstream down, validation).
@@ -39,6 +39,7 @@ Genuinely exceptional bugs still throw and are caught by the `GlobalExceptionHan
 | `result.TryGetValue(out T value)` | `true` + non-null `value` on success. |
 | `result.Error` | `Error.None` on success. |
 | `result.ToResult()` | `Result<T>` → `Result` (drops the value, keeps success/failure). |
+| `Result.TryAsync(work, (TException ex) => error)` | Runs `work` (a `Func<Task<Result<T>>>` or `Func<Task<Result>>`); a `TException` it throws becomes the `Error` the second argument builds, and anything else propagates. How a service catches its gateway's exceptions without a try/catch per method. |
 | implicit `T` → `Result<T>` | `return mappedValue;` from a `Result<T>` method. |
 | implicit `Error` → `Result` / `Result<T>` | `return Error.NotFound(...);` from either. |
 
@@ -165,7 +166,7 @@ into `ResultExtensions.Async.cs` so the core stays readable.
 ## Tests
 
 `tests/KAM.Common.Tests/Results/` — `ResultTests` (factories, `.Value` throw, implicit conversions,
-`ToResult`), `ErrorTests` (categorized factories, `.WithException/.WithContext` immutability,
+`ToResult`, `TryAsync`), `ErrorTests` (categorized factories, `.WithException/.WithContext` immutability,
 `ValidationError`), `ResultCompositionTests` (every sync + async operator, short-circuit
 behaviour, `ResultUtilities`), `ResultHttpExtensionsTests` (each `ErrorType` → status,
 `ProblemDetails` / `ValidationProblem` shape), `ResultLoggingExtensionsTests` (log level

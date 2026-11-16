@@ -37,6 +37,53 @@ public class Result
 
     public static Result<T> Failure<T>(Error error) => new(default, false, error);
 
+    /// <summary>
+    /// Runs <paramref name="work"/> and turns a <typeparamref name="TException"/> it throws into
+    /// the failure <paramref name="onException"/> builds — how a service catches what its client
+    /// or repository throws without a try/catch per method. Any other exception (including
+    /// cancellation) propagates.
+    /// </summary>
+    /// <remarks>
+    /// Declare the handler's parameter type and both type arguments are inferred:
+    /// <c>Result.TryAsync(work, (DbException ex) =&gt; Errors.DatabaseUnavailable.WithException(ex))</c>.
+    /// </remarks>
+    public static async Task<Result<T>> TryAsync<T, TException>(
+        Func<Task<Result<T>>> work,
+        Func<TException, Error> onException)
+        where TException : Exception
+    {
+        ArgumentNullException.ThrowIfNull(work);
+        ArgumentNullException.ThrowIfNull(onException);
+
+        try
+        {
+            return await work();
+        }
+        catch (TException ex)
+        {
+            return Failure<T>(onException(ex));
+        }
+    }
+
+    /// <inheritdoc cref="TryAsync{T, TException}"/>
+    public static async Task<Result> TryAsync<TException>(
+        Func<Task<Result>> work,
+        Func<TException, Error> onException)
+        where TException : Exception
+    {
+        ArgumentNullException.ThrowIfNull(work);
+        ArgumentNullException.ThrowIfNull(onException);
+
+        try
+        {
+            return await work();
+        }
+        catch (TException ex)
+        {
+            return Failure(onException(ex));
+        }
+    }
+
     /// <summary>Lets a method with return type <see cref="Result"/> simply <c>return someError;</c>.</summary>
     public static implicit operator Result(Error error) => Failure(error);
 }

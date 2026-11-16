@@ -134,6 +134,97 @@ public class ResultTests
         Result.Failure<int>(Error.NotFound("X", "y")).ToResult().Error.Code.Should().Be("X");
     }
 
+    private static readonly Error Unavailable = Error.Failure("Store.Unavailable", "The store is down.");
+
+    [Test]
+    public async Task TryAsync_returns_the_works_result_when_nothing_is_thrown()
+    {
+        // Arrange & Act
+        Result<int> result = await Result.TryAsync(
+            () => Task.FromResult(Result.Success(7)),
+            (InvalidOperationException ex) => Unavailable.WithException(ex));
+
+        // Assert
+        result.Value.Should().Be(7);
+    }
+
+    [Test]
+    public async Task TryAsync_passes_a_failed_result_through_unchanged()
+    {
+        // Arrange
+        Error notFound = Error.NotFound("Store.NotFound", "No such item.");
+
+        // Act
+        Result<int> result = await Result.TryAsync(
+            () => Task.FromResult(Result.Failure<int>(notFound)),
+            (InvalidOperationException ex) => Unavailable.WithException(ex));
+
+        // Assert
+        result.Error.Should().Be(notFound);
+    }
+
+    [Test]
+    public async Task TryAsync_turns_the_chosen_exception_into_the_failure_it_builds()
+    {
+        // Arrange
+        InvalidOperationException thrown = new("disk on fire");
+
+        // Act
+        Result<int> result = await Result.TryAsync<int, InvalidOperationException>(
+            () => throw thrown,
+            ex => Unavailable.WithException(ex));
+
+        // Assert
+        using (new AssertionScope())
+        {
+            result.Error.Code.Should().Be(Unavailable.Code);
+            result.Error.Exception.Should().BeSameAs(thrown);
+        }
+    }
+
+    [Test]
+    public Task TryAsync_lets_any_other_exception_propagate()
+    {
+        // Arrange
+        Func<Task<Result<int>>> act = () => Result.TryAsync<int, InvalidOperationException>(
+            () => throw new OperationCanceledException(),
+            ex => Unavailable.WithException(ex));
+
+        // Act & Assert
+        return act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Test]
+    public async Task TryAsync_without_a_value_turns_the_chosen_exception_into_a_failure()
+    {
+        // Arrange & Act
+        Result ok = await Result.TryAsync(
+            () => Task.FromResult(Result.Success()),
+            (InvalidOperationException ex) => Unavailable.WithException(ex));
+        Result failed = await Result.TryAsync<InvalidOperationException>(
+            () => throw new InvalidOperationException(),
+            ex => Unavailable.WithException(ex));
+
+        // Assert
+        using (new AssertionScope())
+        {
+            ok.IsSuccess.Should().BeTrue();
+            failed.Error.Code.Should().Be(Unavailable.Code);
+        }
+    }
+
+    [Test]
+    public Task TryAsync_without_a_value_lets_any_other_exception_propagate()
+    {
+        // Arrange
+        Func<Task<Result>> act = () => Result.TryAsync<InvalidOperationException>(
+            () => throw new OperationCanceledException(),
+            ex => Unavailable.WithException(ex));
+
+        // Act & Assert
+        return act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
     // Result<T> is sealed, so exercise the shared base-class guard through the non-generic Result.
     private sealed class TestableResult(bool isSuccess, Error error) : Result(isSuccess, error);
 }
