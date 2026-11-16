@@ -7,9 +7,9 @@ namespace AspNetDesignPatterns.Api.Features.Library;
 /// <summary>One book by id, or <see cref="LibraryErrors.BookNotFound"/>.</summary>
 internal sealed class GetBookHandler : IRequestHandler<GetBookRequest, BookResponse>
 {
-    private readonly LibraryRepository _repository;
+    private readonly ILibraryRepository _repository;
 
-    public GetBookHandler(LibraryRepository repository) => _repository = repository;
+    public GetBookHandler(ILibraryRepository repository) => _repository = repository;
 
     public async Task<Result<BookResponse>> HandleAsync(GetBookRequest request, CancellationToken cancellationToken)
     {

@@ -102,6 +102,7 @@ public class ReflectionRegistrationTests
         services.GetService<IRequestHandler<ListBooksRequest, CursorPage<BookResponse>>>().Should().BeOfType<ListBooksHandler>();
         services.GetService<IValidator<ListBooksRequest>>().Should().BeOfType<ListBooksRequestValidator>();
         services.GetService<IUnitOfWork>().Should().NotBeNull();
+        services.GetService<ILibraryRepository>().Should().BeOfType<LibraryRepository>();
         services.GetRequiredService<IOptions<LibraryOptions>>().Value.MaxPageSize.Should().BeGreaterThan(0);
     }
 }

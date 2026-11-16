@@ -21,7 +21,7 @@ internal sealed class LibraryDependencies : IDependency
 
         services.TryAddSingleton<IDbConnectionFactory, SqliteConnectionFactory>();
         services.AddUnitOfWork();
-        services.AddScoped<LibraryRepository>();
+        services.AddScoped<ILibraryRepository, LibraryRepository>();
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddHostedService<LibraryDatabaseInitializer>();

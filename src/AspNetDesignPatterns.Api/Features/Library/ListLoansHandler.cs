@@ -10,10 +10,10 @@ namespace AspNetDesignPatterns.Api.Features.Library;
 /// <summary>One page of the caller's loans, newest first.</summary>
 internal sealed class ListLoansHandler : IRequestHandler<ListLoansRequest, CursorPage<LoanResponse>>
 {
-    private readonly LibraryRepository _repository;
+    private readonly ILibraryRepository _repository;
     private readonly LibraryOptions _options;
 
-    public ListLoansHandler(LibraryRepository repository, IOptions<LibraryOptions> options)
+    public ListLoansHandler(ILibraryRepository repository, IOptions<LibraryOptions> options)
     {
         _repository = repository;
         _options = options.Value;

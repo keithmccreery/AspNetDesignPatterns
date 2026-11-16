@@ -12,10 +12,10 @@ namespace AspNetDesignPatterns.Api.Features.Library;
 internal sealed class ReturnLoanHandler : IRequestHandler<ReturnLoanRequest, LoanResponse>
 {
     private readonly IUnitOfWork _unitOfWork;
-    private readonly LibraryRepository _repository;
+    private readonly ILibraryRepository _repository;
     private readonly TimeProvider _timeProvider;
 
-    public ReturnLoanHandler(IUnitOfWork unitOfWork, LibraryRepository repository, TimeProvider timeProvider)
+    public ReturnLoanHandler(IUnitOfWork unitOfWork, ILibraryRepository repository, TimeProvider timeProvider)
     {
         _unitOfWork = unitOfWork;
         _repository = repository;

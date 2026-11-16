@@ -93,9 +93,10 @@ Optional: `docker compose up -d` runs a local OTLP collector (.NET Aspire Dashbo
   if a third assembly is ever added.
 - **Request flow**: endpoint (thin HTTP adapter) → `IRequestHandler<TReq,TRes>` → optional
   `Pipeline<TContext>` → service (returns `Result<T>`) → typed client (may throw). For a
-  database the "client" is a `…Repository` (Dapper over `IUnitOfWork`), and a slice may skip
-  the pipeline and service layers when it has nothing for them to do — `Library` is
-  endpoint → handler → repository, with the handler drawing the transaction boundary.
+  database the "client" is an `I…Repository` (implemented with Dapper over `IUnitOfWork`),
+  and a slice may skip the pipeline and service layers when it has nothing for them to do —
+  `Library` is endpoint → handler → `ILibraryRepository`, with the handler drawing the
+  transaction boundary.
 - **`Program.cs`** is a deliberately flat, banner-organized composition root — **do not**
   extract it into `AddApiServices()` helpers. Feature/Shared registration is already
   factored out into the reflection scans.

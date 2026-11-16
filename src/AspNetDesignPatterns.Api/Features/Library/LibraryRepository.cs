@@ -7,13 +7,10 @@ using KAM.Common.Data;
 namespace AspNetDesignPatterns.Api.Features.Library;
 
 /// <summary>
-/// The Library slice's data access: Dapper over the request's <see cref="IUnitOfWork"/>
-/// connection, enlisting in its transaction when one is open. This is the slice's "client"
-/// layer, the database counterpart of <c>OpenMeteoWeatherClient</c>: SQL in, rows out, and
-/// failures surface as a <see cref="DbException"/> for the handler to turn into a
-/// <see cref="Result"/>. No business rules live here.
+/// <see cref="ILibraryRepository"/> with Dapper over the request's <see cref="IUnitOfWork"/>
+/// connection, enlisting in its transaction when one is open. All of the slice's SQL lives here.
 /// </summary>
-internal sealed class LibraryRepository
+internal sealed class LibraryRepository : ILibraryRepository
 {
     private const string BOOK_COLUMNS =
         "id AS Id, title AS Title, author AS Author, published_year AS PublishedYear, " +
@@ -27,10 +24,7 @@ internal sealed class LibraryRepository
 
     public LibraryRepository(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
 
-    /// <summary>
-    /// One keyset page of books in (title, id) order, optionally filtered. Pass <c>take = limit + 1</c>;
-    /// the extra row tells <c>CursorPage.From</c> whether there's a next page.
-    /// </summary>
+    /// <inheritdoc />
     public async Task<IReadOnlyList<BookRow>> ListBooksAsync(
         string? search,
         BookCursor? after,
@@ -55,6 +49,7 @@ internal sealed class LibraryRepository
             cancellationToken)];
     }
 
+    /// <inheritdoc />
     public async Task<BookRow?> GetBookAsync(int bookId, CancellationToken cancellationToken)
     {
         const string SQL = $"SELECT {BOOK_COLUMNS} FROM books WHERE id = @BookId;";
@@ -62,11 +57,7 @@ internal sealed class LibraryRepository
         return await connection.QuerySingleOrDefaultAsync<BookRow>(Command(SQL, new { BookId = bookId }, cancellationToken));
     }
 
-    /// <summary>
-    /// Takes one copy off the shelf if there is one. A conditional UPDATE, not read-then-write:
-    /// the check and the decrement are one statement, so two borrowers can't both take the last copy.
-    /// </summary>
-    /// <returns><see langword="false"/> when the book doesn't exist or has no copy available.</returns>
+    /// <inheritdoc />
     public async Task<bool> TryTakeCopyAsync(int bookId, CancellationToken cancellationToken)
     {
         const string SQL = """
@@ -76,6 +67,7 @@ internal sealed class LibraryRepository
         return await ExecuteAsync(SQL, new { BookId = bookId }, cancellationToken) == 1;
     }
 
+    /// <inheritdoc />
     public async Task<bool> HasOpenLoanAsync(int bookId, MemberId member, CancellationToken cancellationToken)
     {
         const string SQL = """
@@ -88,6 +80,7 @@ internal sealed class LibraryRepository
             Command(SQL, new { BookId = bookId, MemberId = member.Value }, cancellationToken));
     }
 
+    /// <inheritdoc />
     public async Task<LoanRow> InsertLoanAsync(
         int bookId,
         MemberId member,
@@ -109,7 +102,7 @@ internal sealed class LibraryRepository
         return await GetRequiredLoanAsync(loanId, cancellationToken);
     }
 
-    /// <summary>The member's loan, or <see langword="null"/> if it doesn't exist or belongs to someone else.</summary>
+    /// <inheritdoc />
     public async Task<LoanRow?> GetLoanAsync(int loanId, MemberId member, CancellationToken cancellationToken)
     {
         const string SQL = $"{LOAN_SELECT} WHERE l.id = @LoanId AND l.member_id = @MemberId;";
@@ -118,7 +111,7 @@ internal sealed class LibraryRepository
             Command(SQL, new { LoanId = loanId, MemberId = member.Value }, cancellationToken));
     }
 
-    /// <summary>One keyset page of the member's loans, newest first. Pass <c>take = limit + 1</c>.</summary>
+    /// <inheritdoc />
     public async Task<IReadOnlyList<LoanRow>> ListLoansAsync(
         MemberId member,
         LoanCursor? after,
@@ -140,7 +133,7 @@ internal sealed class LibraryRepository
             cancellationToken)];
     }
 
-    /// <summary>Closes the loan and puts its copy back on the shelf. Two statements: call inside a transaction.</summary>
+    /// <inheritdoc />
     public async Task<LoanRow> ReturnLoanAsync(LoanRow loan, DateTimeOffset returnedAt, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(loan);
@@ -192,36 +185,4 @@ internal sealed class LibraryRepository
                 .Replace(@"\", @"\\", StringComparison.Ordinal)
                 .Replace("%", @"\%", StringComparison.Ordinal)
                 .Replace("_", @"\_", StringComparison.Ordinal) + "%";
-}
-
-/// <summary>A <c>books</c> row.</summary>
-internal sealed class BookRow
-{
-    public int Id { get; init; }
-
-    public string Title { get; init; } = string.Empty;
-
-    public string Author { get; init; } = string.Empty;
-
-    public int PublishedYear { get; init; }
-
-    public int TotalCopies { get; init; }
-
-    public int AvailableCopies { get; init; }
-}
-
-/// <summary>A <c>loans</c> row joined to its book's title.</summary>
-internal sealed class LoanRow
-{
-    public int Id { get; init; }
-
-    public int BookId { get; init; }
-
-    public string BookTitle { get; init; } = string.Empty;
-
-    public DateTimeOffset BorrowedAt { get; init; }
-
-    public DateTimeOffset DueAt { get; init; }
-
-    public DateTimeOffset? ReturnedAt { get; init; }
 }

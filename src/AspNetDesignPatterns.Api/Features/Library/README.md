@@ -29,12 +29,13 @@ carry both (`Jwt:DevTokenScopes`).
 | `LibraryRequests.cs` | The single-resource requests. No validators: an id that matches nothing is already a 404. |
 | `MemberId.cs` | The caller, from the token's `sub` claim — bound into request records by `BindAsync`, so handlers never see a `ClaimsPrincipal`. |
 | `*Handler.cs` (6) | The use cases. Each owns its logic directly (no service layer — see below), catches `DbException` → `LibraryErrors.DatabaseUnavailable`. `BorrowBookHandler` and `ReturnLoanHandler` run in a transaction. |
-| `LibraryRepository.cs` | Dapper SQL over `IUnitOfWork`; `BookRow` / `LoanRow`. The slice's "client" layer: no business rules, may throw `DbException`. |
+| `ILibraryRepository.cs` | The slice's "client" layer, the counterpart of `IWeatherClient`: what handlers depend on, plus the `BookRow` / `LoanRow` it returns. No business rules; may throw `DbException`. |
+| `LibraryRepository.cs` | The implementation: every SQL statement in the slice, Dapper over `IUnitOfWork`. |
 | `BookResponse.cs`, `LoanResponse.cs` | The API contract, mapped from rows. |
 | `LibraryErrors.cs` | Every `Error` the slice returns. |
 | `LibraryAuthorization.cs` | `LibraryPolicies` / `LibraryScopes`. |
 | `LibraryOptions.cs` | `ConnectionString`, `DefaultPageSize` (20), `MaxPageSize` (100), `LoanPeriod` (14 days) + validator. |
-| `LibraryDependencies.cs` | `IDependency`: connection factory, `AddUnitOfWork()`, repository, Dapper type handler, migrations, health check. |
+| `LibraryDependencies.cs` | `IDependency`: connection factory, `AddUnitOfWork()`, `ILibraryRepository` → `LibraryRepository`, Dapper type handler, migrations, health check. |
 | `SqliteConnectionFactory.cs` | The app's `IDbConnectionFactory`; resolves a relative `Data Source` against the content root. |
 | `DateTimeOffsetTypeHandler.cs` | Dapper ↔ ISO-8601 UTC text, since SQLite has no date type. |
 | `LibraryDatabaseInitializer.cs` | `IHostedService` that runs `SqlScriptMigrator` on `Schema/*.sql` before the server starts listening. |
@@ -112,12 +113,21 @@ SQLite's FTS5 (or the database's full-text search) is the next step.
 ## Not every slice needs every layer
 
 `Weather` has endpoint → handler → pipeline → service → client. This slice has
-endpoint → handler → repository: no pipeline (nothing to compose) and **no service**, because
+endpoint → handler → `ILibraryRepository`: no pipeline (nothing to compose) and **no service**, because
 each use case is used by exactly one handler. The handler owns the use case, including the
 transaction and the `DbException` → `Error` translation that `WeatherService` does for
 `Weather`. If several handlers ever need the same rule, that's the moment to extract a
 service. "Only the client layer throws" still holds: the repository throws (via Dapper), the
 handlers catch.
+
+### Why an interface, if the tests use the real repository?
+
+Handlers depend on `ILibraryRepository` for the same reason they'd depend on any other
+service's interface: consistent DI (`AddScoped<ILibraryRepository, LibraryRepository>()`, like
+`IWeatherClient`), and the handler's dependencies read as contracts, not SQL. It isn't there to
+be mocked: the handler tests run the real `LibraryRepository` on in-memory SQLite, because the
+conditional `UPDATE`, the rollback and the unique index are the behavior under test, and a
+substitute would fake them away.
 
 ## Tests
 

@@ -14,10 +14,10 @@ namespace AspNetDesignPatterns.Api.Features.Library;
 /// </summary>
 internal sealed class ListBooksHandler : IRequestHandler<ListBooksRequest, CursorPage<BookResponse>>
 {
-    private readonly LibraryRepository _repository;
+    private readonly ILibraryRepository _repository;
     private readonly LibraryOptions _options;
 
-    public ListBooksHandler(LibraryRepository repository, IOptions<LibraryOptions> options)
+    public ListBooksHandler(ILibraryRepository repository, IOptions<LibraryOptions> options)
     {
         _repository = repository;
         _options = options.Value;

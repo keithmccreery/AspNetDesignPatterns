@@ -16,13 +16,13 @@ namespace AspNetDesignPatterns.Api.Features.Library;
 internal sealed class BorrowBookHandler : IRequestHandler<BorrowBookRequest, LoanResponse>
 {
     private readonly IUnitOfWork _unitOfWork;
-    private readonly LibraryRepository _repository;
+    private readonly ILibraryRepository _repository;
     private readonly TimeProvider _timeProvider;
     private readonly LibraryOptions _options;
 
     public BorrowBookHandler(
         IUnitOfWork unitOfWork,
-        LibraryRepository repository,
+        ILibraryRepository repository,
         TimeProvider timeProvider,
         IOptions<LibraryOptions> options)
     {

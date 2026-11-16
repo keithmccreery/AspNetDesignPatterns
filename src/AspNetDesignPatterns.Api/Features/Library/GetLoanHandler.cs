@@ -7,9 +7,9 @@ namespace AspNetDesignPatterns.Api.Features.Library;
 /// <summary>One of the caller's loans, or <see cref="LibraryErrors.LoanNotFound"/>.</summary>
 internal sealed class GetLoanHandler : IRequestHandler<GetLoanRequest, LoanResponse>
 {
-    private readonly LibraryRepository _repository;
+    private readonly ILibraryRepository _repository;
 
-    public GetLoanHandler(LibraryRepository repository) => _repository = repository;
+    public GetLoanHandler(ILibraryRepository repository) => _repository = repository;
 
     public async Task<Result<LoanResponse>> HandleAsync(GetLoanRequest request, CancellationToken cancellationToken)
     {
