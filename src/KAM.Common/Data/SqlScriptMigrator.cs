@@ -24,7 +24,11 @@ public static class SqlScriptMigrator
     private const string VERSIONS_TABLE = "schema_versions";
 
     /// <summary>Applies every unapplied script and returns the names of those it applied.</summary>
-    public static async Task<IReadOnlyList<string>> ApplyAsync(
+    /// <remarks>
+    /// Not <c>async</c> itself, so a bad argument throws at the call rather than when the task is
+    /// awaited (ErrorProne.NET EPC37); the work happens in the <c>static</c> local function.
+    /// </remarks>
+    public static Task<IReadOnlyList<string>> ApplyAsync(
         DbConnection connection,
         Assembly assembly,
         string resourcePrefix,
@@ -36,38 +40,49 @@ public static class SqlScriptMigrator
         ArgumentException.ThrowIfNullOrWhiteSpace(resourcePrefix);
         ArgumentNullException.ThrowIfNull(timeProvider);
 
-        await ExecuteAsync(
-            connection,
-            transaction: null,
-            $"CREATE TABLE IF NOT EXISTS {VERSIONS_TABLE} (script TEXT NOT NULL PRIMARY KEY, applied_at TEXT NOT NULL);",
-            cancellationToken);
+        return ApplyCoreAsync(connection, assembly, resourcePrefix, timeProvider, cancellationToken);
 
-        HashSet<string> applied = await ReadAppliedAsync(connection, cancellationToken);
-
-        IEnumerable<string> pending = assembly.GetManifestResourceNames()
-            .Where(name => name.StartsWith(resourcePrefix, StringComparison.Ordinal)
-                        && name.EndsWith(".sql", StringComparison.OrdinalIgnoreCase))
-            .Select(name => name[resourcePrefix.Length..])
-            .Where(script => !applied.Contains(script))
-            .Order(StringComparer.Ordinal);
-
-        List<string> newlyApplied = [];
-        foreach (string script in pending)
+        // A static local function: only this method can call it, and it can use only what is passed in.
+        static async Task<IReadOnlyList<string>> ApplyCoreAsync(
+            DbConnection connection,
+            Assembly assembly,
+            string resourcePrefix,
+            TimeProvider timeProvider,
+            CancellationToken cancellationToken)
         {
-            string sql = await ReadScriptAsync(assembly, resourcePrefix + script, cancellationToken);
+            await ExecuteAsync(
+                connection,
+                transaction: null,
+                $"CREATE TABLE IF NOT EXISTS {VERSIONS_TABLE} (script TEXT NOT NULL PRIMARY KEY, applied_at TEXT NOT NULL);",
+                cancellationToken);
 
-            DbTransaction transaction = await connection.BeginTransactionAsync(cancellationToken);
-            await using (transaction)
+            HashSet<string> applied = await ReadAppliedAsync(connection, cancellationToken);
+
+            IEnumerable<string> pending = assembly.GetManifestResourceNames()
+                .Where(name => name.StartsWith(resourcePrefix, StringComparison.Ordinal)
+                            && name.EndsWith(".sql", StringComparison.OrdinalIgnoreCase))
+                .Select(name => name[resourcePrefix.Length..])
+                .Where(script => !applied.Contains(script))
+                .Order(StringComparer.Ordinal);
+
+            List<string> newlyApplied = [];
+            foreach (string script in pending)
             {
-                await ExecuteAsync(connection, transaction, sql, cancellationToken);
-                await RecordAsync(connection, transaction, script, timeProvider.GetUtcNow(), cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
+                string sql = await ReadScriptAsync(assembly, resourcePrefix + script, cancellationToken);
+
+                DbTransaction transaction = await connection.BeginTransactionAsync(cancellationToken);
+                await using (transaction)
+                {
+                    await ExecuteAsync(connection, transaction, sql, cancellationToken);
+                    await RecordAsync(connection, transaction, script, timeProvider.GetUtcNow(), cancellationToken);
+                    await transaction.CommitAsync(cancellationToken);
+                }
+
+                newlyApplied.Add(script);
             }
 
-            newlyApplied.Add(script);
+            return newlyApplied;
         }
-
-        return newlyApplied;
     }
 
     private static async Task<HashSet<string>> ReadAppliedAsync(DbConnection connection, CancellationToken cancellationToken)

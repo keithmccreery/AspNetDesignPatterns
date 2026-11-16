@@ -225,6 +225,18 @@ public class ResultTests
         return act.Should().ThrowAsync<OperationCanceledException>();
     }
 
+    [Test]
+    public void TryAsync_rejects_a_null_argument_at_the_call_not_when_awaited()
+    {
+        // Arrange — the task is discarded, never awaited: only an eager throw can fail this test
+        Action withValue = () => _ = Result.TryAsync<int, InvalidOperationException>(null!, ex => Unavailable);
+        Action withoutValue = () => _ = Result.TryAsync<InvalidOperationException>(() => Task.FromResult(Result.Success()), null!);
+
+        // Act & Assert
+        withValue.Should().Throw<ArgumentNullException>().WithParameterName("work");
+        withoutValue.Should().Throw<ArgumentNullException>().WithParameterName("onException");
+    }
+
     // Result<T> is sealed, so exercise the shared base-class guard through the non-generic Result.
     private sealed class TestableResult(bool isSuccess, Error error) : Result(isSuccess, error);
 }
