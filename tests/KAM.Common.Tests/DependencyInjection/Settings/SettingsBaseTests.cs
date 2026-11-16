@@ -11,7 +11,7 @@ namespace KAM.Common.Tests.DependencyInjection.Settings;
 /// <summary>
 /// <see cref="SettingsBase{T}"/> binds a settings class to its <c>Section</c> and validates
 /// on startup — FluentValidation when a validator is registered, DataAnnotations otherwise.
-/// (A class with no <c>Section</c> at all no longer compiles, so there's no test for that.)
+/// (A class with no <c>Section</c> doesn't compile, so there's no test for that.)
 /// </summary>
 [TestFixture]
 public class SettingsBaseTests
@@ -100,9 +100,9 @@ public class SettingsBaseTests
     [Test]
     public void FluentValidation_path_is_used_even_when_the_validator_is_registered_after_the_settings()
     {
-        // Arrange & Act — this used to fall back to DataAnnotations (which has no rule for Name,
-        // so it would have *accepted* the empty value): the validator was looked for at
-        // registration time, before it existed.
+        // Arrange & Act — the validator is looked up when validation runs, so registering it
+        // last still selects FluentValidation (DataAnnotations has no rule for Name and would
+        // accept the empty value).
         IOptions<FluentSettings> options = Resolve<FluentSettings>(
             new() { ["Fluent:Name"] = "" }, withValidator: true, validatorRegisteredAfterSettings: true);
 

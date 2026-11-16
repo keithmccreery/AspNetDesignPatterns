@@ -32,8 +32,8 @@ internal sealed class WeatherProviderHealthCheck(HttpClient httpClient, IMemoryC
         // The cache holds the in-flight probe *Task*, not its result, and the probe runs on no
         // caller's token (its HttpClient's own 5s timeout bounds it). Two consequences:
         //  - A caller that disconnects mid-probe only stops *waiting* (WaitAsync); the shared
-        //    probe completes and caches the real answer. Running it on the first caller's token
-        //    used to turn that disconnect into a cached "Degraded" for the whole window.
+        //    probe completes and caches the real answer, rather than a "Degraded" caused by
+        //    one client hanging up.
         //  - Callers arriving while a probe is in flight await the same Task instead of
         //    starting their own. IMemoryCache takes no lock, so two callers missing in the
         //    instant before the entry is set can still each start one -- a narrow race, not a

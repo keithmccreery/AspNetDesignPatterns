@@ -180,8 +180,8 @@ public class OpenMeteoWeatherClientTests
         // Act
         Func<Task> act = () => client.GetForecastAsync(0, 0, 1, CancellationToken.None);
 
-        // Assert — this is the shape that used to reach WeatherService.Map and throw an
-        // uncaught NullReferenceException / IndexOutOfRangeException several layers up.
+        // Assert — the client rejects it, so WeatherService.Map never sees a body that would
+        // throw a NullReferenceException / IndexOutOfRangeException.
         return act.Should().ThrowAsync<WeatherClientException>();
     }
 
