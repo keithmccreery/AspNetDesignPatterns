@@ -129,3 +129,6 @@ keep adding more. A real slice should take only the layers it needs:
 - The endpoint → handler → `Result` → `ToHttpResult()` spine and the "only clients throw"
   rule are the parts that *aren't* optional.
 
+[`Features/Library/`](../Library/README.md) is the worked example of a leaner slice:
+endpoint → handler → repository, with no pipeline or service.
+
