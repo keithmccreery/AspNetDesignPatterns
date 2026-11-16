@@ -23,7 +23,7 @@ Genuinely exceptional bugs still throw and are caught by the `GlobalExceptionHan
 | `Result.cs` | `Result` and `sealed Result<T>` — the outcome type. |
 | `Error.cs` | `Error` (record), `ErrorType` (category enum), `ValidationError` (per-field failures). |
 | `ResultExtensions.cs` | `partial` — synchronous railway operators: `Match`, `Map`, `Bind`, `Ensure`, `Tap`, `TapError`. |
-| `ResultExtensions.Async.cs` | `partial` — the async counterparts (three shapes each) + `ToHttpResultAsync`. |
+| `ResultExtensions.Async.cs` | `partial` — the async counterparts (three shapes each) + `ToHttpResultAsync` (optionally with a custom success response, e.g. `201 Created`). |
 | `ResultUtilities.cs` | Combinators over *several* results: `Combine`, `CombineAll`, `FirstSuccess`, `Ensure` (on a raw value). |
 | `ResultHttpExtensions.cs` | `result.ToHttpResult()` → RFC 9457 `ProblemDetails` / `ValidationProblem`, plus `ErrorType.ToStatusCode()`. |
 | `ResultLoggingExtensions.cs` | `result.LogOnFailure(logger)` / `LogOnSuccess` / `LogResult` / `LogError`, sync + async. |
