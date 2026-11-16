@@ -100,18 +100,27 @@ Optional: `docker compose up -d` runs a local OTLP collector (.NET Aspire Dashbo
    Only the client (HttpClient/DB/SDK) throws. See `KAM.Common/Results/README.md`.
 2. **Endpoints return `ProblemDetails`** via `result.ToHttpResult()` — never a bespoke error
    shape.
-3. **No new registration in `Program.cs` per feature.** Add an `IEndpoint`, `IRequestHandler`,
+3. **Each feature defines its errors once, in `Features/<Name>/<Name>Errors.cs`** — an
+   `internal static class` of `public static readonly Error` fields built with the categorized
+   factories (`Error.NotFound(...)`, `Error.Upstream(...)`, …, never `new Error(...)`, whose
+   type defaults to `Failure` → 500). Codes are `<Feature>.<Reason>` (e.g.
+   `Weather.ProviderUnavailable`) and are API contract: they reach the client in
+   `ProblemDetails` and are what logs and tests match on, so no inline code strings at call
+   sites, in tests either. `Error` is immutable, so attach per-call detail with
+   `.WithException(ex)` / `.WithContext(...)` on the shared instance. See
+   `Features/Weather/WeatherErrors.cs`.
+4. **No new registration in `Program.cs` per feature.** Add an `IEndpoint`, `IRequestHandler`,
    `SettingsBase<T>`, `IPipelineStep<>`, or an `IDependency` module — the scans pick it up.
-4. **Settings** = `class XOptions : SettingsBase<XOptions>, ISettingsSection` with
+5. **Settings** = `class XOptions : SettingsBase<XOptions>, ISettingsSection` with
    `public static string Section` (a missing `Section` is a build error). It
    self-registers, binds, and validates on startup (FluentValidation if a validator exists,
    else DataAnnotations).
-5. **Secrets** come from `.env` (`Jwt__SigningKey`), never a committed `appsettings.json`.
-6. **`ILogger<T>` only** — Serilog is the implementation detail. Services generally take no
+6. **Secrets** come from `.env` (`Jwt__SigningKey`), never a committed `appsettings.json`.
+7. **`ILogger<T>` only** — Serilog is the implementation detail. Services generally take no
    logger; they attach context to the `Error` and the boundary calls `result.LogOnFailure(logger)`.
-7. **Untrusted strings in logs**: the `ControlCharacterSanitizingEnricher` handles top-level
+8. **Untrusted strings in logs**: the `ControlCharacterSanitizingEnricher` handles top-level
    scalars globally; don't put raw user input inside destructured (`{@obj}`) log payloads.
-8. **Every mapped endpoint declares its auth intent explicitly** — `.RequireAuthorization(...)`
+9. **Every mapped endpoint declares its auth intent explicitly** — `.RequireAuthorization(...)`
    or `.AllowAnonymous()`, never neither. Enforced twice: `EndpointAuthorizationTests`
    (`tests/…/Integration/`) fails the build if one doesn't, and `FallbackPolicy` denies by
    default at runtime as the backstop if that test is ever bypassed.
@@ -190,6 +199,6 @@ same block also silences the XML-doc completeness/style family (`RCS1141`, `SA16
 
 ## When adding a feature
 
-Copy the shape of `Features/Weather/` and its README. Add the 5 pieces (request+validator,
-response, handler, endpoint, and — if needed — `IDependency` / `SettingsBase<T>` / pipeline
-steps), plus a matching test folder. Nothing else to wire.
+Copy the shape of `Features/Weather/` and its README. Add the 6 pieces (request+validator,
+response, handler, endpoint, `<Name>Errors`, and — if needed — `IDependency` /
+`SettingsBase<T>` / pipeline steps), plus a matching test folder. Nothing else to wire.

@@ -126,7 +126,8 @@ real default where the value is used (see `Cors/README.md` for the bug this caus
 ## Adding a feature
 
 1. Create `Features/<Name>/` (in `AspNetDesignPatterns.Api`, not `KAM.Common`).
-2. Add a request + `AbstractValidator`, a response DTO, an `IRequestHandler`, an `IEndpoint`.
+2. Add a request + `AbstractValidator`, a response DTO, an `IRequestHandler`, an `IEndpoint`,
+   and a `<Name>Errors` class holding every `Error` the feature returns.
 3. Feature-owned services (typed client, repository)? Add an `IDependency`.
 4. Reads config? Add a `SettingsBase<T>, ISettingsSection` class (+ a validator if you want
    FluentValidation).
