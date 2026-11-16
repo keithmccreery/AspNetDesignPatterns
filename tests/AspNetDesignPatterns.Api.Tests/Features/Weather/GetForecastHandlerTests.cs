@@ -23,7 +23,7 @@ public class GetForecastHandlerTests
     {
         ServiceCollection services = new();
         services.AddSingleton(_client);
-        services.AddScoped<WeatherService>();
+        services.AddScoped<IWeatherService, WeatherService>();
         services.AddScoped<FetchForecastStep>();
         services.AddScoped<RoundTemperaturesStep>();
         services.AddSingleton<IPipelineFactory, PipelineFactory>();

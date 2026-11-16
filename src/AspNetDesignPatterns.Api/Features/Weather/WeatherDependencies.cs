@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 namespace AspNetDesignPatterns.Api.Features.Weather;
 
 /// <summary>
-/// Weather-feature DI: the domain service, the typed <see cref="IWeatherClient"/>, and the
+/// Weather-feature DI: the service (<see cref="IWeatherService"/>), the typed <see cref="IWeatherClient"/>, and the
 /// feature's readiness health check. Discovered and invoked by the composition root via
 /// <see cref="IDependency"/>.
 /// </summary>
@@ -24,7 +24,7 @@ internal sealed class WeatherDependencies : IDependency
 {
     public void RegisterServices(IServiceCollection services)
     {
-        services.AddScoped<WeatherService>();
+        services.AddScoped<IWeatherService, WeatherService>();
 
         services.AddHttpClient<IWeatherClient, OpenMeteoWeatherClient>((provider, client) =>
             {
