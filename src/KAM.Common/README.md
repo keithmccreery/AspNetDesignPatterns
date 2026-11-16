@@ -8,6 +8,8 @@ knows a feature exists. Every folder here is a top-level namespace under `KAM.Co
 | [`DependencyInjection/`](DependencyInjection/README.md) | `KAM.Common.DependencyInjection` | The reflection-registration conventions (`IEndpoint`, `ISettings`, `IDependency`, `IRequestHandler<,>` scans) and the global exception handler. |
 | [`Results/`](Results/README.md) | `KAM.Common.Results` | `Result` / `Result<T>` + `Error`, railway-oriented composition, `Error → ProblemDetails`, result logging. |
 | [`Pipeline/`](Pipeline/README.md) | `KAM.Common.Pipeline` | Middleware-style sequential pipeline over a shared context. |
+| [`Data/`](Data/README.md) | `KAM.Common.Data` | Plain ADO.NET: a scoped unit of work whose transaction commits or rolls back on the `Result`, and an embedded-script schema migrator. |
+| [`Pagination/`](Pagination/README.md) | `KAM.Common.Pagination` | Cursor (keyset) pagination: request/response shapes, an opaque cursor codec, shared validation. |
 | [`FluentValidations/`](FluentValidations/README.md) | `KAM.Common.FluentValidations` | Request validation at the HTTP edge and inside services. |
 | [`Logging/`](Logging/README.md) | `KAM.Common.Logging` | CWE-117 log-injection hardening for Serilog. |
 | [`Authentication/`](Authentication/README.md) | `KAM.Common.Authentication` | JWT bearer authentication, dev-token endpoint. |

@@ -7,7 +7,7 @@ namespace AspNetDesignPatterns.Api.Tests.Integration;
 [TestFixture]
 public class HealthCheckEndpointsTests
 {
-    private static WeatherApiFactory Factory => GlobalTestSetup.Factory;
+    private static ApiFactory Factory => GlobalTestSetup.Factory;
 
     private static async Task<(HttpResponseMessage Response, JsonElement Body)> GetAsync(string path)
     {

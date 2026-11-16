@@ -14,7 +14,7 @@ internal sealed class ForecastContext(GetForecastRequest request)
 }
 
 /// <summary>Core: call the service and stash the mapped forecast on the context.</summary>
-internal sealed class FetchForecastStep(WeatherService service) : IPipelineStep<ForecastContext>
+internal sealed class FetchForecastStep(IWeatherService service) : IPipelineStep<ForecastContext>
 {
     public async Task<Result> ExecuteAsync(
         ForecastContext context,

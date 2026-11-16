@@ -8,7 +8,7 @@ namespace AspNetDesignPatterns.Api.Tests.Features.Weather;
 
 /// <summary>
 /// <see cref="WeatherDependencies"/>'s <c>AddHttpClient&lt;IWeatherClient, OpenMeteoWeatherClient&gt;</c>
-/// configuration delegate never runs under any other test — <c>WeatherApiFactory</c> substitutes
+/// configuration delegate never runs under any other test — <c>ApiFactory</c> substitutes
 /// <see cref="IWeatherClient"/> outright, so nothing else proves <c>BaseAddress</c>/<c>Timeout</c>
 /// are actually wired from <see cref="WeatherOptions"/>, nor that the resilience timeouts are.
 /// </summary>

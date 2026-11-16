@@ -439,4 +439,21 @@ public class ResultExtensionsAsyncTests
         ok.Should().BeOfType<Microsoft.AspNetCore.Http.HttpResults.NoContent>();
         err.Should().BeOfType<Microsoft.AspNetCore.Http.HttpResults.ProblemHttpResult>();
     }
+
+    [Test]
+    public async Task ToHttpResultAsync_with_a_custom_success_response_uses_it_only_on_success()
+    {
+        // Arrange
+        static Microsoft.AspNetCore.Http.IResult Created(int value) =>
+            Microsoft.AspNetCore.Http.TypedResults.Created($"/things/{value}", value);
+
+        // Act
+        Microsoft.AspNetCore.Http.IResult ok = await OkAsync(7).ToHttpResultAsync(Created);
+        Microsoft.AspNetCore.Http.IResult err = await FailAsync().ToHttpResultAsync(Created);
+
+        // Assert
+        ok.Should().BeOfType<Microsoft.AspNetCore.Http.HttpResults.Created<int>>()
+            .Which.Location.Should().Be("/things/7");
+        err.Should().BeOfType<Microsoft.AspNetCore.Http.HttpResults.ProblemHttpResult>();
+    }
 }

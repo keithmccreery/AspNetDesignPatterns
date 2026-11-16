@@ -281,4 +281,8 @@ public static partial class ResultExtensions
 
     public static async Task<IResult> ToHttpResultAsync<T>(this Task<Result<T>> resultTask) =>
         (await resultTask).ToHttpResult();
+
+    /// <summary>As above, with a custom success response — e.g. <c>201 Created</c> instead of <c>200 OK</c>.</summary>
+    public static async Task<IResult> ToHttpResultAsync<T>(this Task<Result<T>> resultTask, Func<T, IResult> onSuccess) =>
+        (await resultTask).ToHttpResult(onSuccess);
 }

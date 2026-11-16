@@ -1,34 +1,25 @@
 namespace AspNetDesignPatterns.Api.Features.Weather;
 
 /// <summary>
-/// The first layer above the client. Turns whatever the client does — a value or a
-/// <see cref="WeatherClientException"/> — into a <see cref="Result{T}"/>, and maps the
-/// upstream shape to the API contract.
+/// <see cref="IWeatherService"/>: calls the client, maps the upstream shape to the API contract,
+/// and turns a <see cref="WeatherClientException"/> into
+/// <see cref="WeatherErrors.ProviderUnavailable"/> with <see cref="Result.TryAsync{T, TException}"/>.
 /// </summary>
 /// <remarks>
 /// Takes no <c>ILogger</c>: on failure it attaches the exception and request context to the
 /// <see cref="Error"/> and lets the boundary log it (<c>result.LogOnFailure(logger)</c>).
 /// </remarks>
-internal sealed class WeatherService(IWeatherClient client)
+internal sealed class WeatherService(IWeatherClient client) : IWeatherService
 {
-    public async Task<Result<ForecastResponse>> GetForecastAsync(
+    public Task<Result<ForecastResponse>> GetForecastAsync(
         GetForecastRequest request,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            OpenMeteoForecast upstream = await client.GetForecastAsync(
-                request.Latitude, request.Longitude, request.Days, cancellationToken);
-
-            return Map(upstream);
-        }
-        catch (WeatherClientException ex)
-        {
-            return WeatherErrors.ProviderUnavailable
+        CancellationToken cancellationToken) =>
+        Result.TryAsync(
+            async () => Result.Success(Map(await client.GetForecastAsync(
+                request.Latitude, request.Longitude, request.Days, cancellationToken))),
+            (WeatherClientException ex) => WeatherErrors.ProviderUnavailable
                 .WithException(ex)
-                .WithContext(new { request.Latitude, request.Longitude, request.Days });
-        }
-    }
+                .WithContext(new { request.Latitude, request.Longitude, request.Days }));
 
     private static ForecastResponse Map(OpenMeteoForecast upstream)
     {

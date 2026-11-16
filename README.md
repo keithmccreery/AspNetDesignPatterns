@@ -5,7 +5,8 @@ practices used on real .NET projects. It starts from the classic "weather" examp
 built to grow: features are vertical slices, cross-cutting concerns live in one place, and
 new endpoints are discovered by reflection rather than wired by hand.
 
-> Status: first cut. One feature slice (`Weather`) exercises every pattern end to end.
+> Status: growing. Two feature slices: `Weather` (an upstream HTTP API, every request-side
+> pattern) and `Library` (its own SQLite database: Dapper, transactions, cursor paging).
 
 ## Tech
 
@@ -71,9 +72,10 @@ dotnet test
 ```
 
 Unit tests cover the shared primitives (their own project,
-`KAM.Common.Tests`) and the `Weather` handler/service/validator in
-isolation. Integration tests (`tests/…/Integration`) boot the real app in memory with a
-fake `IWeatherClient`, assert status codes and `ProblemDetails` bodies, and prove the two
+`KAM.Common.Tests`, with the data-access pieces run against real in-memory SQLite) and each
+slice's handlers and validators — `Library`'s against a real in-memory database with the
+slice's own schema. Integration tests (`tests/…/Integration`) boot the real app in memory with a
+fake `IWeatherClient` and an in-memory library database, assert status codes and `ProblemDetails` bodies, and prove the two
 projects' reflection scans actually discover each other's types (`ReflectionRegistrationTests`
 — the two-assembly split's one real failure mode, see
 [`KAM.Common/README.md`](src/KAM.Common/README.md)).
@@ -115,20 +117,21 @@ src/AspNetDesignPatterns.Api/          the host — depends on the project below
   GlobalUsings.cs
   AspNetDesignPatterns.Api.http / http-client.env.json   ready-to-run requests, Local/Azure envs
   Features/                  one folder per vertical slice (endpoint + handler + service + …)
-    Weather/                 see Features/Weather/README.md
+    Weather/                 see Features/Weather/README.md (upstream HTTP API, pipeline)
+    Library/                 see Features/Library/README.md (SQLite + Dapper, unit of work, cursor paging)
 src/KAM.Common/             reusable, no reference to the project above — see its own README
   DependencyInjection/       reflection-registration conventions — see DependencyInjection/README.md
   Authentication/ Authorization/ Cors/ Results/ Pipeline/ FluentValidations/ Logging/
-  OpenApi/ Configuration/ Handlers/ HealthChecks/ Telemetry/  cross-cutting building blocks,
+  OpenApi/ Configuration/ Handlers/ HealthChecks/ Telemetry/ Data/ Pagination/  cross-cutting building blocks,
                              one top-level folder per concern (each has its own README.md)
 tests/AspNetDesignPatterns.Api.Tests/  tests AspNetDesignPatterns.Api (+ the two wired together)
   GlobalTestSetup.cs         [SetUpFixture] owning the one shared WebApplicationFactory
-  TestSupport/               shared test doubles (currently just StubHttpMessageHandler)
+  TestSupport/               shared test doubles (StubHttpMessageHandler, LibraryTestDatabase)
   Features/ Integration/     — mirrors the src layout; Integration/ also proves the two
                              projects' reflection scans actually find each other's types
   Architecture/              NetArchTest rules that enforce the conventions — see its README
 tests/KAM.Common.Tests/     tests KAM.Common in isolation — mirrors its layout exactly
-  TestSupport/               shared test doubles (FakeHostEnvironment, ManageEnvironmentVariables)
+  TestSupport/               shared test doubles (FakeHostEnvironment, ManageEnvironmentVariables, InMemorySqliteDatabase)
 ```
 
 Every shared service has a focused unit-test file mirroring its folder, and a `README.md`
@@ -141,21 +144,25 @@ next to the code. `src/KAM.Common/README.md` and `DependencyInjection/README.md`
 | **Minimal APIs, vertical slices** | Each feature owns its endpoint, handler, DTOs, service and validator under `Features/<Name>/`. | [`Features/Weather/`](src/AspNetDesignPatterns.Api/Features/Weather) |
 | **Reflection-based registration** | One assembly scan each for `IEndpoint`, `ISettings`, `IRequestHandler<,>`, `IPipelineStep<>`; `IDependency` modules contribute anything convention can't. No central file to edit per feature — every scan takes the assemblies explicitly, so it works across the `KAM.Common` / `AspNetDesignPatterns.Api` project boundary too. | [`DependencyInjection/`](src/KAM.Common/DependencyInjection) |
 | **`IRequestHandler<TReq,TRes>`** | Endpoints are thin HTTP adapters; behaviour lives in a handler resolved from DI. | [`Handlers/IRequestHandler.cs`](src/KAM.Common/Handlers/IRequestHandler.cs), [`Features/Weather/GetForecastHandler.cs`](src/AspNetDesignPatterns.Api/Features/Weather/GetForecastHandler.cs) |
-| **`Result` / `Result<T>`** | Every layer from Services up returns a result instead of throwing; only clients throw. `Error` carries a category, and optionally the originating exception + a logging context. | [`Results/Result.cs`](src/KAM.Common/Results/Result.cs), [`Error.cs`](src/KAM.Common/Results/Error.cs) |
+| **Layered slice: handler → service → gateway** | Every slice has the same layers, named by role: the handler maps to the API contract, the `I<Name>Service` owns the rules, the transaction and exception → `Error`, and the gateway (`I<Name>Client` for HTTP, `I<Name>Repository` for a database) does one call per method and may throw. An architecture test keeps handlers off the gateway. | [`Features/Weather/WeatherService.cs`](src/AspNetDesignPatterns.Api/Features/Weather/WeatherService.cs), [`Features/Library/LibraryService.cs`](src/AspNetDesignPatterns.Api/Features/Library/LibraryService.cs) |
+| **`Result` / `Result<T>`** | Every layer from Services up returns a result instead of throwing; only the gateway (a `…Client` or `…Repository`) throws, and its service catches with `Result.TryAsync`. `Error` carries a category, and optionally the originating exception + a logging context. | [`Results/Result.cs`](src/KAM.Common/Results/Result.cs), [`Error.cs`](src/KAM.Common/Results/Error.cs) |
 | **Railway-oriented composition** | `Map` / `Bind` / `Ensure` / `Tap` chain fallible steps — sync and async (`…Async` overloads for `Task<Result>` inputs and async projections). `ResultUtilities` aggregates several results (`Combine`, `CombineAll`, `FirstSuccess`). | [`ResultExtensions.cs`](src/KAM.Common/Results/ResultExtensions.cs) + [`.Async.cs`](src/KAM.Common/Results/ResultExtensions.Async.cs), [`ResultUtilities.cs`](src/KAM.Common/Results/ResultUtilities.cs) |
 | **Result logging** | `result.LogOnFailure(logger).ToHttpResult()` — one call logs the outcome with the error's exception + context; services don't take an `ILogger`. | [`Results/ResultLoggingExtensions.cs`](src/KAM.Common/Results/ResultLoggingExtensions.cs) |
 | **`ProblemDetails` on errors** | One mapping from `Error` → status code → RFC 9457 body; endpoints just call `result.ToHttpResult()`. Same shape the global handler produces. | [`Results/ResultHttpExtensions.cs`](src/KAM.Common/Results/ResultHttpExtensions.cs) |
 | **Global exception handler** | `IExceptionHandler` + `IProblemDetailsService` turns anything uncaught into a 500 `ProblemDetails` with a trace id. | [`DependencyInjection/ExceptionHandling/GlobalExceptionHandler.cs`](src/KAM.Common/DependencyInjection/ExceptionHandling/GlobalExceptionHandler.cs) |
 | **Pipeline pattern** | Middleware-style: each `IPipelineStep<TContext>` gets a `next` delegate — it can short-circuit, or run code after the rest of the chain. Composed per use case via `IPipelineFactory`. | [`Pipeline/`](src/KAM.Common/Pipeline), [`Features/Weather/ForecastPipeline.cs`](src/AspNetDesignPatterns.Api/Features/Weather/ForecastPipeline.cs) |
+| **Unit of Work (ADO.NET + Dapper)** | One connection and transaction per request; the service draws the boundary with `ExecuteInTransactionAsync`, which **commits a successful `Result` and rolls back a failed one** — so a rule that fails after a write needs no compensating code. Provider- and mapper-agnostic; the slice uses SQLite + Dapper. | [`Data/`](src/KAM.Common/Data), [`Features/Library/LibraryService.cs`](src/AspNetDesignPatterns.Api/Features/Library/LibraryService.cs) |
+| **Cursor (keyset) pagination** | `limit` + an opaque `cursor` (the last row's sort key, JSON → base64url); the query seeks `WHERE (title, id) > (…)`, constant-cost at any depth and stable under inserts. Shared validator turns a bad cursor into a 400. Offset paging documented as the alternative. | [`Pagination/`](src/KAM.Common/Pagination), [`Features/Library/`](src/AspNetDesignPatterns.Api/Features/Library) |
+| **Schema migrations** | Numbered `.sql` scripts embedded in the slice, applied once at startup (each in its own transaction, recorded in `schema_versions`) by a provider-agnostic runner — no EF Core, no DbUp. | [`Data/SqlScriptMigrator.cs`](src/KAM.Common/Data/SqlScriptMigrator.cs), [`Features/Library/Schema/`](src/AspNetDesignPatterns.Api/Features/Library/Schema) |
 | **FluentValidation** | An endpoint filter validates the request model at the HTTP edge; `ValidateAsResult` validates inside a service/pipeline step and returns a `Result`. | [`FluentValidations/ValidationFilter.cs`](src/KAM.Common/FluentValidations/ValidationFilter.cs), [`ValidationResultExtensions.cs`](src/KAM.Common/FluentValidations/ValidationResultExtensions.cs) |
 | **Self-registering settings** | `SettingsBase<T>` + `ISettingsSection` binds a settings class to its own `Section` (a `static abstract` member, so a missing one is a build error) and validates on startup — FluentValidation if a validator is registered, else DataAnnotations, chosen when validation runs so registration order doesn't matter. | [`DependencyInjection/Settings/SettingsBase.cs`](src/KAM.Common/DependencyInjection/Settings/SettingsBase.cs), [`WeatherOptions.cs`](src/AspNetDesignPatterns.Api/Features/Weather/WeatherOptions.cs) (FluentValidation), [`Authentication/JwtOptions.cs`](src/KAM.Common/Authentication/JwtOptions.cs) (DataAnnotations) |
 | **Serilog → ILogger** | Config from `appsettings.json`; request logging; the app only ever depends on `ILogger<T>`. | `Program.cs` (`AddSerilog`) |
 | **Log-injection hardening (CWE-117)** | A Serilog enricher strips CR/LF from every scalar log property, globally. | [`Logging/ControlCharacterSanitizingEnricher.cs`](src/KAM.Common/Logging/ControlCharacterSanitizingEnricher.cs), [`LogSanitizer.cs`](src/KAM.Common/Logging/LogSanitizer.cs) |
 | **OpenAPI + Scalar + versioning** | `AddApiVersioning().AddOpenApi()` produces one document per API version; a transformer adds the JWT scheme; the document is served outside Production and Scalar renders it in Development — both anonymous. | `Program.cs`, [`OpenApi/OpenApiExtensions.cs`](src/KAM.Common/OpenApi/OpenApiExtensions.cs) |
-| **System.Text.Json** | One `JsonSerializerOptions` built in `Program.cs`, registered as a singleton, and mirrored into Minimal API serialization. | `Program.cs` (`CreateJsonSerializerOptions`) |
+| **System.Text.Json** | One configuration (`ConfigureJsonSerializer`) applied to the framework's Minimal API instance, and that same instance registered as the `JsonSerializerOptions` everything else injects. | `Program.cs` (`ConfigureJsonSerializer`) |
 | **HttpClient + Polly** | `ConfigureHttpClientDefaults(... AddStandardResilienceHandler())` gives every typed client retry / circuit-breaker / timeout. | `Program.cs`, [`Features/Weather/WeatherDependencies.cs`](src/AspNetDesignPatterns.Api/Features/Weather/WeatherDependencies.cs) |
 | **`.env` files** | `DotNetEnv` loads `.env` into environment variables before configuration is built. | `Program.cs`, [`.env.example`](src/AspNetDesignPatterns.Api/.env.example) |
-| **Environment model** | `AppEnvironment` — a small "where/how am I running" view (env name, containerized) used for Kestrel and Scalar gating. | [`Configuration/AppEnvironment.cs`](src/KAM.Common/Configuration/AppEnvironment.cs) |
+| **Environment model** | `AppEnvironment` — a small "where/how am I running" view (env name, containerized) for startup code to branch on. | [`Configuration/AppEnvironment.cs`](src/KAM.Common/Configuration/AppEnvironment.cs) |
 | **AuthN (JWT bearer)** | Bearer token validation configured from `JwtOptions` (issuer/audience/lifetime toggles, clock skew, claim-type overrides), `JwtBearerEvents` logging, a Development-only dev-token endpoint (with its own request validator). | [`Authentication/`](src/KAM.Common/Authentication) |
 | **AuthZ (config-driven policies)** | Named authorization policies — required scopes/roles/claims, plus custom requirements — defined in `appsettings.json`, not hardcoded C#; scopes checked via a space-delimited-claim-aware helper so it works against a real IdP, not just this app's own tokens; a **deny-by-default fallback policy**; a worked custom `IAuthorizationRequirement` example (`ValidClientIdRequirement`). | [`Authorization/`](src/KAM.Common/Authorization) |
 | **CORS** | A single named policy configured from `appsettings.json`; `"*"` means "any" for headers/methods (not a literal value), and a `"*"` origin can't combine with credentials — both enforced at startup, not as a runtime browser surprise. | [`Cors/`](src/KAM.Common/Cors) |

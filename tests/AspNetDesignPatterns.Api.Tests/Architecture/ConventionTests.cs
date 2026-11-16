@@ -112,15 +112,46 @@ public class ConventionTests
     }
 
     [Test]
-    public void Endpoints_do_not_reach_past_the_handler_into_services_or_clients()
+    public void Endpoints_do_not_reach_past_the_handler_into_services_clients_or_repositories()
     {
         // Arrange & Act
         TestResult result = ArchitectureRules.InProductionCode()
             .That().ImplementInterface(typeof(IEndpoint))
-            .ShouldNot().MeetCustomRule(CustomRules.DependsOnAServiceOrClient)
+            .ShouldNot().MeetCustomRule(CustomRules.DependsOnALayerBelowTheHandler)
             .GetResult();
 
         // Assert
         ArchitectureRules.AssertRuleHolds(result, "an endpoint binds + validates + delegates to IRequestHandler — nothing lower");
+    }
+
+    [Test]
+    public void Handlers_and_pipeline_steps_reach_the_gateway_only_through_a_service()
+    {
+        // Arrange & Act
+        TestResult result = ArchitectureRules.InProductionCode()
+            .That().ImplementInterface(typeof(IRequestHandler<,>))
+            .Or().ImplementInterface(typeof(IPipelineStep<>))
+            .ShouldNot().MeetCustomRule(CustomRules.DependsOnTheGatewayLayer)
+            .GetResult();
+
+        // Assert
+        ArchitectureRules.AssertRuleHolds(
+            result,
+            "a client, repository or unit of work is the service's to use — that's where its exceptions become a Result");
+    }
+
+    [Test]
+    public void The_gateway_rule_can_see_a_gateway_dependency()
+    {
+        // Not a rule — a check that the rule above can fail: LibraryService uses the repository
+        // and the unit of work, so applying the rule to services must find it.
+        // Arrange & Act
+        TestResult result = ArchitectureRules.InProductionCode()
+            .That().HaveNameEndingWith("Service", StringComparison.Ordinal)
+            .ShouldNot().MeetCustomRule(CustomRules.DependsOnTheGatewayLayer)
+            .GetResult();
+
+        // Assert
+        result.FailingTypeNames.Should().Contain(name => name.EndsWith(".LibraryService", StringComparison.Ordinal));
     }
 }

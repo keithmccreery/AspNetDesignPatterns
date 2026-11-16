@@ -22,7 +22,8 @@ public class SanityTests
     public void The_feature_slices_are_discovered()
     {
         // Arrange & Act & Assert
-        ArchitectureRules.FeatureNamespaces.Should().Contain(ArchitectureRules.FeaturesNamespace + ".Weather");
+        ArchitectureRules.FeatureNamespaces.Should().Contain(
+            [ArchitectureRules.FeaturesNamespace + ".Weather", ArchitectureRules.FeaturesNamespace + ".Library"]);
     }
 
     [TestCase(typeof(IEndpoint))]
@@ -57,6 +58,7 @@ public class SanityTests
     [TestCase("Service")]
     [TestCase("Handler")]
     [TestCase("Client")]
+    [TestCase("Repository")]
     public void At_least_one_feature_type_is_named_with_each_role_suffix(string suffix)
     {
         // Arrange & Act

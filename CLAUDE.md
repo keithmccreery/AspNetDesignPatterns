@@ -7,7 +7,8 @@ Guidance for Claude Code when working in this repository.
 A **reference** ASP.NET Core Minimal API (`.NET 10`) that demonstrates the patterns and
 standard practices used on real projects. It is meant to be read and copied from, so clarity
 and consistency matter more than cleverness. It grows one vertical-slice feature at a time;
-`Weather` is the reference slice that exercises every pattern.
+`Weather` is the reference slice that exercises every request-side pattern; `Library` is the
+data slice (SQLite + Dapper, unit of work, cursor paging).
 
 ## Commands
 
@@ -43,6 +44,8 @@ Running the app: copy `src/AspNetDesignPatterns.Api/.env.example` → `.env`, se
 `Jwt__SigningKey` (≥32 chars). Scalar UI at `/scalar`, OpenAPI at `/openapi/v1.json`,
 probes at `/health/live` + `/health/ready`.
 `GET /api/v1/weather/forecast` proxies the live open-meteo API (needs network); tests fake it.
+`/api/v1/library/*` uses `library.db` in the content root (git-ignored), created and seeded on
+first run — delete it to start over; tests use in-memory SQLite.
 Optional: `docker compose up -d` runs a local OTLP collector (.NET Aspire Dashboard,
 `localhost:18888`) for traces/logs/metrics — the app runs identically without it (see
 `KAM.Common/Telemetry/README.md`).
@@ -56,10 +59,12 @@ Optional: `docker compose up -d` runs a local OTLP collector (.NET Aspire Dashbo
   its README for why it's named `KAM.Common` and not something tied to the sample app). `Api`
   takes a `ProjectReference` on `KAM.Common`; never the other way round.
 - **Vertical slices** under `Features/<Name>/` (in `AspNetDesignPatterns.Api`) — each owns its
-  endpoint, request+validator, response DTO, handler, service, client, options, pipeline steps.
+  endpoint, request+validator, response DTO, handler, service, client or repository, options,
+  pipeline steps.
 - **Cross-cutting building blocks** (in `KAM.Common`) — one top-level folder per concern
   (`Results/`, `Pipeline/`, `Authentication/`, `Authorization/`, `Cors/`, `HealthChecks/`,
-  `OpenApi/`, `Logging/`, `FluentValidations/`, `Configuration/`, `Handlers/`, `Telemetry/`),
+  `OpenApi/`, `Logging/`, `FluentValidations/`, `Configuration/`, `Handlers/`, `Telemetry/`,
+  `Data/`, `Pagination/`),
   each with a README. Infrastructure that is genuinely cross-cutting (auth, CORS, OpenAPI,
   health checks, telemetry) *is* wired in `Program.cs`; only *feature* registration goes
   through the reflection scans / `IDependency`. A type a reflection scan needs to see from
@@ -87,17 +92,30 @@ Optional: `docker compose up -d` runs a local OTLP collector (.NET Aspire Dashbo
   settings/endpoint/handler/dependency/step in the assembly *not* passed is never discovered,
   with no error at startup) — extend the array in `Program.cs`, don't rely on the default,
   if a third assembly is ever added.
-- **Request flow**: endpoint (thin HTTP adapter) → `IRequestHandler<TReq,TRes>` → optional
-  `Pipeline<TContext>` → service (returns `Result<T>`) → typed client (may throw).
+- **Request flow and layer names** — the same four layers in every slice, named by role:
+
+  | Layer | Name | Returns | Owns |
+  |---|---|---|---|
+  | Endpoint | `<Verb><Noun>Endpoint` | `IResult` | HTTP binding, auth, validation |
+  | Handler | `<Verb><Noun>Handler` (`IRequestHandler<TReq,TRes>`) | `Result<TResponse>` | the use case: maps to response DTOs, cursors, an optional `Pipeline<TContext>` |
+  | Service | `I<Name>Service` / `<Name>Service` | `Result<T>` | business rules, the order of gateway calls, the transaction (`IUnitOfWork`), gateway exception → `Error` |
+  | Gateway | `I<Name>Client` (HTTP/SDK) or `I<Name>Repository` (database) | plain values / `null` | one external call or one database operation per method; **may throw** |
+
+  `Weather` is endpoint → handler → pipeline → `IWeatherService` → `IWeatherClient`; `Library`
+  is endpoint → handler → `ILibraryService` → `ILibraryRepository` (Dapper over `IUnitOfWork`).
+  A service method may be a pass-through; it still exists, because it's where exceptions stop.
+  Handlers and pipeline steps never touch a client, repository or `IUnitOfWork` (enforced by
+  an architecture test).
 - **`Program.cs`** is a deliberately flat, banner-organized composition root — **do not**
   extract it into `AddApiServices()` helpers. Feature/Shared registration is already
   factored out into the reflection scans.
 
 ## Non-negotiable conventions
 
-1. **`Result` / `Result<T>` above the client layer.** Services and handlers never throw
-   upward; they catch client exceptions and return `Error.Upstream(...).WithException(ex)`.
-   Only the client (HttpClient/DB/SDK) throws. See `KAM.Common/Results/README.md`.
+1. **`Result` / `Result<T>` above the gateway layer.** Only a `…Client` or `…Repository`
+   throws. The service catches what its gateway throws with `Result.TryAsync(work, (TException
+   ex) => <Name>Errors.X.WithException(ex))` — one place per service, not a try/catch per method —
+   so handlers never see an exception. See `KAM.Common/Results/README.md`.
 2. **Endpoints return `ProblemDetails`** via `result.ToHttpResult()` — never a bespoke error
    shape.
 3. **Each feature defines its errors once, in `Features/<Name>/<Name>Errors.cs`** — an
@@ -177,14 +195,19 @@ same block also silences the XML-doc completeness/style family (`RCS1141`, `SA16
 - Every test body is sectioned with `// Arrange`, `// Act`, `// Assert` comments, in that
   order. Fuse the labels when the steps fuse: `// Arrange & Act`, `// Act & Assert`, or
   `// Arrange & Act & Assert` for a single fluent line.
-- Integration tests: one shared `WeatherApiFactory` owned by `GlobalTestSetup` (`[SetUpFixture]`)
+- Integration tests: one shared `ApiFactory` owned by `GlobalTestSetup` (`[SetUpFixture]`)
   — Serilog's two-stage init freezes the static logger on host build, so a single host keeps
-  it deterministic.
+  it deterministic. It gives the app a private in-memory SQLite database (kept alive for the
+  run), which the app migrates and seeds at startup; tests sharing it use their own member
+  (`sub`) and put back any copy they borrow.
+- Database code is tested against **real in-memory SQLite**, not mocked `DbConnection`s:
+  rollbacks, constraints and SQL are the behavior under test.
 - **Two test projects**, mirroring the two src projects — `AspNetDesignPatterns.Api.Tests`
   references `AspNetDesignPatterns.Api` (and transitively `KAM.Common`); `KAM.Common.Tests`
   references only `KAM.Common`, never the host, for the same reason `KAM.Common` doesn't
-  reference the host. Each has its own `TestSupport/` — `StubHttpMessageHandler` in the Api
-  one; `FakeHostEnvironment` and `ManageEnvironmentVariables` in the KAM.Common one — split by
+  reference the host. Each has its own `TestSupport/` — `StubHttpMessageHandler` and
+  `LibraryTestDatabase` in the Api one; `FakeHostEnvironment`, `ManageEnvironmentVariables` and
+  `InMemorySqliteDatabase` in the KAM.Common one — split by
   which project's tests actually use them, not duplicated.
 - `tests/…/Architecture/` (in `AspNetDesignPatterns.Api.Tests`) enforces the conventions in
   this file with NetArchTest (services return `Result`, only clients throw, no cross-feature
@@ -199,6 +222,7 @@ same block also silences the XML-doc completeness/style family (`RCS1141`, `SA16
 
 ## When adding a feature
 
-Copy the shape of `Features/Weather/` and its README. Add the 6 pieces (request+validator,
-response, handler, endpoint, `<Name>Errors`, and — if needed — `IDependency` /
+Copy the shape of `Features/Weather/` (external API) or `Features/Library/` (database) and its
+README. Add the pieces (request+validator, response, handler, endpoint, `<Name>Errors`,
+`I<Name>Service` + gateway, an `IDependency` registering them, and — if needed —
 `SettingsBase<T>` / pipeline steps), plus a matching test folder. Nothing else to wire.

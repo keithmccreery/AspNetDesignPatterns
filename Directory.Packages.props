@@ -34,6 +34,13 @@
     <PackageVersion Include="Serilog.Sinks.OpenTelemetry" Version="4.2.0" />
   </ItemGroup>
 
+  <ItemGroup Label="Data">
+    <!-- Features/Library only. KAM.Common's Data/ (unit of work, script migrator) is plain
+         ADO.NET (System.Data.Common), so the library itself takes neither package. -->
+    <PackageVersion Include="Dapper" Version="2.1.89" />
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.15" />
+  </ItemGroup>
+
   <ItemGroup Label="Versioning">
     <!-- Stamps AssemblyVersion/AssemblyInformationalVersion from git height + commit, repo-wide
          (Directory.Build.props), configured by version.json. TelemetryExtensions.ResolveServiceVersion

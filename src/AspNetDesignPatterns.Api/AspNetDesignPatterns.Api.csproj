@@ -28,6 +28,13 @@
          it shares KAM.Common.Telemetry.TelemetrySettings.OtlpEndpoint with the trace/metric
          exporters, so one config value drives all three signals to the same collector. -->
     <PackageReference Include="Serilog.Sinks.OpenTelemetry" />
+    <PackageReference Include="Dapper" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Each slice's numbered schema scripts, applied at startup by KAM.Common's SqlScriptMigrator. -->
+    <EmbeddedResource Include="Features\**\Schema\*.sql" />
   </ItemGroup>
 
   <ItemGroup>
