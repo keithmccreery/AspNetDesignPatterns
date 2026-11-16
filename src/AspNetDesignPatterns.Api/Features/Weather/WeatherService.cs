@@ -24,8 +24,7 @@ internal sealed class WeatherService(IWeatherClient client)
         }
         catch (WeatherClientException ex)
         {
-            return Error
-                .Upstream("Weather.ProviderUnavailable", "The weather provider is currently unavailable. Please retry shortly.")
+            return WeatherErrors.ProviderUnavailable
                 .WithException(ex)
                 .WithContext(new { request.Latitude, request.Longitude, request.Days });
         }

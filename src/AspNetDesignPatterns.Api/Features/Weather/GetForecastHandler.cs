@@ -8,31 +8,40 @@ namespace AspNetDesignPatterns.Api.Features.Weather;
 /// (fetch → round) and running it, returning its outcome as a
 /// <see cref="Result{T}"/>.
 /// </summary>
-internal sealed class GetForecastHandler(IPipelineFactory pipelineFactory)
-    : IRequestHandler<GetForecastRequest, ForecastResponse>
+internal sealed class GetForecastHandler : IRequestHandler<GetForecastRequest, ForecastResponse>
 {
+    private readonly IPipelineFactory _pipelineFactory;
+
+    public GetForecastHandler(IPipelineFactory pipelineFactory) => _pipelineFactory = pipelineFactory;
+
     public async Task<Result<ForecastResponse>> HandleAsync(
         GetForecastRequest request,
         CancellationToken cancellationToken)
     {
         ForecastContext context = new(request);
 
-        Pipeline<ForecastContext> pipeline = pipelineFactory.CreateBuilder<ForecastContext>()
+        Pipeline<ForecastContext> pipeline = _pipelineFactory.CreateBuilder<ForecastContext>()
             .Use<FetchForecastStep>()
             .Use<RoundTemperaturesStep>()
             .Build();
 
         Result result = await pipeline.ExecuteAsync(context, cancellationToken);
 
+        // The pipeline returns a plain Result (steps share ForecastContext, not a return value),
+        // so the failure is re-wrapped as a Result<ForecastResponse> and the response is read
+        // back off the context.
         if (result.IsFailure)
         {
-            return result.Error;
+            return Result.Failure<ForecastResponse>(result.Error);
         }
 
-        // A step that short-circuits with success (or forgets to set Response) is a bug in this
-        // pipeline -- surface it as a 500 rather than a 200 with a null body.
-        return context.Response is { } response
-            ? response
-            : Error.Failure("Weather.NoResponse", "The forecast pipeline completed without producing a response.");
+        // Success with no Response means a step returned success without setting it -- a bug in
+        // this pipeline, so a 500, never a 200 with an empty body.
+        if (context.Response is null)
+        {
+            return Result.Failure<ForecastResponse>(WeatherErrors.NoResponse);
+        }
+
+        return Result.Success(context.Response);
     }
 }

@@ -66,7 +66,7 @@ public class GetForecastHandlerTests
         {
             result.IsFailure.Should().BeTrue();
             result.Error.Type.Should().Be(ErrorType.Upstream);
-            result.Error.Code.Should().Be("Weather.ProviderUnavailable");
+            result.Error.Code.Should().Be(WeatherErrors.ProviderUnavailable.Code);
         }
     }
 
@@ -90,7 +90,7 @@ public class GetForecastHandlerTests
         using (new AssertionScope())
         {
             result.IsFailure.Should().BeTrue();
-            result.Error.Code.Should().Be("Weather.NoResponse");
+            result.Error.Code.Should().Be(WeatherErrors.NoResponse.Code);
             result.Error.Type.Should().Be(ErrorType.Failure);
         }
     }

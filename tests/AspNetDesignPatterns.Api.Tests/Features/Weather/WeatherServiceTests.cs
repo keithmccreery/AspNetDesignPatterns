@@ -60,7 +60,7 @@ public class WeatherServiceTests
         {
             result.IsFailure.Should().BeTrue();
             result.Error.Type.Should().Be(ErrorType.Upstream);
-            result.Error.Code.Should().Be("Weather.ProviderUnavailable");
+            result.Error.Code.Should().Be(WeatherErrors.ProviderUnavailable.Code);
             result.Error.Exception.Should().BeOfType<WeatherClientException>();
             result.Error.Context.Should().NotBeNull();
         }
