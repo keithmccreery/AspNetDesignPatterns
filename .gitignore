@@ -441,6 +441,11 @@ FodyWeavers.xsd
 /logs/
 **/logs/
 
+# Local SQLite databases (Features/Library creates library.db on first run)
+*.db
+*.db-shm
+*.db-wal
+
 # macOS
 .DS_Store
 **/.DS_Store

@@ -10,6 +10,7 @@ using KAM.Common.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -19,8 +20,10 @@ using NSubstitute;
 namespace AspNetDesignPatterns.Api.Tests.Integration;
 
 /// <summary>
-/// Boots the real application in memory with two seams: deterministic JWT settings and a
-/// substitute <see cref="IWeatherClient"/> so tests never touch the network.
+/// Boots the real application in memory with three seams: deterministic JWT settings, a
+/// substitute <see cref="IWeatherClient"/> so tests never touch the network, and a private
+/// in-memory SQLite database for the Library slice (migrated and seeded by the app's own
+/// startup, exactly as in production) so tests never touch the disk.
 /// </summary>
 public sealed class ApiFactory : WebApplicationFactory<Program>
 {
@@ -29,6 +32,17 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
     private const string SIGNING_KEY = "integration-tests-signing-key-0123456789";
     private const string ISSUER = "https://tests/aspnetdesignpatterns";
     private const string AUDIENCE = "aspnetdesignpatterns.tests";
+
+    // A shared-cache in-memory database exists only while a connection to it is open: this one
+    // keeps it alive for the factory's lifetime, across every request's own connection.
+    private readonly string _libraryConnectionString = $"Data Source=library-tests-{Guid.NewGuid():N};Mode=Memory;Cache=Shared;Foreign Keys=True";
+    private readonly SqliteConnection _libraryKeepAlive;
+
+    public ApiFactory()
+    {
+        _libraryKeepAlive = new SqliteConnection(_libraryConnectionString);
+        _libraryKeepAlive.Open();
+    }
 
     public IWeatherClient WeatherClient { get; } = Substitute.For<IWeatherClient>();
 
@@ -42,6 +56,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             ["Jwt:Issuer"] = ISSUER,
             ["Jwt:Audience"] = AUDIENCE,
             ["Weather:BaseAddress"] = "https://weather.test",
+            ["Library:ConnectionString"] = _libraryConnectionString,
         }));
 
         builder.ConfigureTestServices(services =>
@@ -54,6 +69,15 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             services.AddHttpClient<WeatherProviderHealthCheck>()
                 .ConfigurePrimaryHttpMessageHandler(() => new StubHttpMessageHandler(HttpStatusCode.OK));
         });
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (disposing)
+        {
+            _libraryKeepAlive.Dispose();
+        }
     }
 
     /// <summary>Creates a client carrying a valid bearer token minted by the dev-token endpoint.</summary>

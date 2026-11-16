@@ -29,3 +29,33 @@ GET {{HostAddress}}/api/v1/weather/forecast?latitude=52.52&longitude=13.40&days=
 ### Weather forecast with an invalid query param -- expect 400 ProblemDetails (FluentValidation)
 GET {{HostAddress}}/api/v1/weather/forecast?latitude=999&longitude=13.40&days=3
 Authorization: Bearer {{token.response.body.$.accessToken}}
+
+### Library: first page of books (cursor paging, see Features/Library/README.md)
+# @name books
+GET {{HostAddress}}/api/v1/library/books?limit=5
+Authorization: Bearer {{token.response.body.$.accessToken}}
+
+### Library: next page -- pass nextCursor back unchanged (null on the last page)
+GET {{HostAddress}}/api/v1/library/books?limit=5&cursor={{books.response.body.$.nextCursor}}
+Authorization: Bearer {{token.response.body.$.accessToken}}
+
+### Library: search title or author
+GET {{HostAddress}}/api/v1/library/books?search=austen
+Authorization: Bearer {{token.response.body.$.accessToken}}
+
+### Library: a tampered cursor -- expect 400 ValidationProblemDetails on Cursor
+GET {{HostAddress}}/api/v1/library/books?cursor=tampered
+Authorization: Bearer {{token.response.body.$.accessToken}}
+
+### Library: borrow the first book on the page -- expect 201 + Location (409 once its copies run out)
+# @name loan
+POST {{HostAddress}}/api/v1/library/books/{{books.response.body.$.items[0].id}}/loans
+Authorization: Bearer {{token.response.body.$.accessToken}}
+
+### Library: your loans, newest first
+GET {{HostAddress}}/api/v1/library/loans
+Authorization: Bearer {{token.response.body.$.accessToken}}
+
+### Library: return the loan -- a second return is a 409
+POST {{HostAddress}}/api/v1/library/loans/{{loan.response.body.$.id}}/return
+Authorization: Bearer {{token.response.body.$.accessToken}}

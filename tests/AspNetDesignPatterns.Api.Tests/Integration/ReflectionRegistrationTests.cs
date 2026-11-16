@@ -1,9 +1,12 @@
+using AspNetDesignPatterns.Api.Features.Library;
 using AspNetDesignPatterns.Api.Features.Weather;
 
 using FluentValidation;
 
+using KAM.Common.Data;
 using KAM.Common.DependencyInjection;
 using KAM.Common.Handlers;
+using KAM.Common.Pagination;
 using KAM.Common.Pipeline;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -84,5 +87,21 @@ public class ReflectionRegistrationTests
 
         // Assert
         options.Value.MaxForecastDays.Should().BeGreaterThan(0);
+    }
+
+    [Test]
+    public void The_second_slice_is_wired_the_same_way()
+    {
+        // Arrange
+        using IServiceScope scope = Scope();
+        IServiceProvider services = scope.ServiceProvider;
+
+        // Act & Assert — nothing about Library was added to Program.cs
+        services.GetServices<IEndpoint>().Should().Contain(e => e is BorrowBookEndpoint);
+        services.GetService<IRequestHandler<BorrowBookRequest, LoanResponse>>().Should().BeOfType<BorrowBookHandler>();
+        services.GetService<IRequestHandler<ListBooksRequest, CursorPage<BookResponse>>>().Should().BeOfType<ListBooksHandler>();
+        services.GetService<IValidator<ListBooksRequest>>().Should().BeOfType<ListBooksRequestValidator>();
+        services.GetService<IUnitOfWork>().Should().NotBeNull();
+        services.GetRequiredService<IOptions<LibraryOptions>>().Value.MaxPageSize.Should().BeGreaterThan(0);
     }
 }
