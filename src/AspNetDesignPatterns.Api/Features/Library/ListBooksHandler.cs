@@ -1,5 +1,3 @@
-using System.Data.Common;
-
 using KAM.Common.Handlers;
 using KAM.Common.Pagination;
 
@@ -8,22 +6,21 @@ using Microsoft.Extensions.Options;
 namespace AspNetDesignPatterns.Api.Features.Library;
 
 /// <summary>
-/// One page of books. The handler owns the use case directly — there's no service layer in this
-/// slice (see the README): it calls the repository and turns a <see cref="DbException"/> into
-/// <see cref="LibraryErrors.DatabaseUnavailable"/>.
+/// One page of books. The handler owns the paging contract (the cursor, the page size, the extra
+/// row that says whether there's a next page); <see cref="ILibraryService"/> owns the data.
 /// </summary>
 internal sealed class ListBooksHandler : IRequestHandler<ListBooksRequest, CursorPage<BookResponse>>
 {
-    private readonly ILibraryRepository _repository;
+    private readonly ILibraryService _library;
     private readonly LibraryOptions _options;
 
-    public ListBooksHandler(ILibraryRepository repository, IOptions<LibraryOptions> options)
+    public ListBooksHandler(ILibraryService library, IOptions<LibraryOptions> options)
     {
-        _repository = repository;
+        _library = library;
         _options = options.Value;
     }
 
-    public async Task<Result<CursorPage<BookResponse>>> HandleAsync(
+    public Task<Result<CursorPage<BookResponse>>> HandleAsync(
         ListBooksRequest request,
         CancellationToken cancellationToken)
     {
@@ -32,19 +29,9 @@ internal sealed class ListBooksHandler : IRequestHandler<ListBooksRequest, Curso
         // Already validated by ListBooksRequestValidator; no cursor means the first page.
         CursorCodec.TryDecode(request.Cursor, out BookCursor? after);
 
-        try
-        {
-            IReadOnlyList<BookRow> rows = await _repository.ListBooksAsync(request.Search, after, limit + 1, cancellationToken);
-
-            return CursorPage
+        return _library.ListBooksAsync(request.Search, after, limit + 1, cancellationToken)
+            .MapAsync(rows => CursorPage
                 .From(rows, limit, row => new BookCursor(row.Title, row.Id))
-                .Map(BookResponse.From);
-        }
-        catch (DbException ex)
-        {
-            return LibraryErrors.DatabaseUnavailable
-                .WithException(ex)
-                .WithContext(new { request.Search, request.Limit });
-        }
+                .Map(BookResponse.From));
     }
 }

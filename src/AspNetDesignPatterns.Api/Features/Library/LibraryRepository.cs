@@ -134,25 +134,25 @@ internal sealed class LibraryRepository : ILibraryRepository
     }
 
     /// <inheritdoc />
-    public async Task<LoanRow> ReturnLoanAsync(LoanRow loan, DateTimeOffset returnedAt, CancellationToken cancellationToken)
+    public async Task<LoanRow> CloseLoanAsync(int loanId, DateTimeOffset returnedAt, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(loan);
-
         await ExecuteAsync(
             "UPDATE loans SET returned_at = @ReturnedAt WHERE id = @LoanId AND returned_at IS NULL;",
-            new { LoanId = loan.Id, ReturnedAt = returnedAt },
+            new { LoanId = loanId, ReturnedAt = returnedAt },
             cancellationToken);
 
-        await ExecuteAsync(
-            "UPDATE books SET available_copies = available_copies + 1 WHERE id = @BookId;",
-            new { loan.BookId },
-            cancellationToken);
-
-        return await GetRequiredLoanAsync(loan.Id, cancellationToken);
+        return await GetRequiredLoanAsync(loanId, cancellationToken);
     }
 
+    /// <inheritdoc />
+    public Task ReturnCopyAsync(int bookId, CancellationToken cancellationToken) =>
+        ExecuteAsync(
+            "UPDATE books SET available_copies = available_copies + 1 WHERE id = @BookId;",
+            new { BookId = bookId },
+            cancellationToken);
+
     // A loan this repository has just written: QuerySingle, so a missing row (which would be a
-    // bug) throws here, in the layer allowed to throw, instead of reaching a handler as null.
+    // bug) throws here, in the layer allowed to throw, instead of reaching the service as null.
     private async Task<LoanRow> GetRequiredLoanAsync(int loanId, CancellationToken cancellationToken)
     {
         DbConnection connection = await _unitOfWork.GetConnectionAsync(cancellationToken);

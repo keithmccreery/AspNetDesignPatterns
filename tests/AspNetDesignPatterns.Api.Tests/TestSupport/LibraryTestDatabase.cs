@@ -15,7 +15,8 @@ namespace AspNetDesignPatterns.Api.Tests.TestSupport;
 /// <summary>
 /// A private in-memory SQLite database with the Library slice's real schema, plus a DI container
 /// wired by the slice's real <see cref="LibraryDependencies"/>. <see cref="SendAsync{TRequest,TResponse}"/>
-/// runs a handler in its own scope — its own connection and unit of work, like a request.
+/// (a handler) and <see cref="CallAsync{T}"/> (the service) each run in their own scope — their own
+/// connection and unit of work, like a request.
 /// Starts with no books (the seed script's rows are deleted) so each test states its own data.
 /// </summary>
 internal sealed class LibraryTestDatabase : IDbConnectionFactory, IDisposable
@@ -74,6 +75,14 @@ internal sealed class LibraryTestDatabase : IDbConnectionFactory, IDisposable
         IRequestHandler<TRequest, TResponse> handler =
             scope.ServiceProvider.GetRequiredService<IRequestHandler<TRequest, TResponse>>();
         return await handler.HandleAsync(request, CancellationToken.None);
+    }
+
+    /// <summary>Calls the real <see cref="ILibraryService"/> in a fresh DI scope.</summary>
+    public async Task<T> CallAsync<T>(Func<ILibraryService, Task<T>> call)
+    {
+        ArgumentNullException.ThrowIfNull(call);
+        await using AsyncServiceScope scope = _services.CreateAsyncScope();
+        return await call(scope.ServiceProvider.GetRequiredService<ILibraryService>());
     }
 
     public int AddBook(string title, string author = "An Author", int copies = 1)

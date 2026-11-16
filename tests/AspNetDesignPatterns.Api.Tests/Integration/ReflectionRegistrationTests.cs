@@ -51,13 +51,14 @@ public class ReflectionRegistrationTests
     }
 
     [Test]
-    public void Pipeline_factory_and_steps_are_discovered()
+    public void Pipeline_factory_steps_and_service_are_registered()
     {
         // Arrange
         using IServiceScope scope = Scope();
 
         // Act & Assert
         scope.ServiceProvider.GetService<IPipelineFactory>().Should().NotBeNull();
+        scope.ServiceProvider.GetService<IWeatherService>().Should().BeOfType<WeatherService>();
         scope.ServiceProvider.GetService<FetchForecastStep>().Should().NotBeNull();
         scope.ServiceProvider.GetService<RoundTemperaturesStep>().Should().NotBeNull();
     }
@@ -102,6 +103,7 @@ public class ReflectionRegistrationTests
         services.GetService<IRequestHandler<ListBooksRequest, CursorPage<BookResponse>>>().Should().BeOfType<ListBooksHandler>();
         services.GetService<IValidator<ListBooksRequest>>().Should().BeOfType<ListBooksRequestValidator>();
         services.GetService<IUnitOfWork>().Should().NotBeNull();
+        services.GetService<ILibraryService>().Should().BeOfType<LibraryService>();
         services.GetService<ILibraryRepository>().Should().BeOfType<LibraryRepository>();
         services.GetRequiredService<IOptions<LibraryOptions>>().Value.MaxPageSize.Should().BeGreaterThan(0);
     }

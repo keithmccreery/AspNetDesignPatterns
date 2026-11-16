@@ -3,17 +3,24 @@ using System.Data.Common;
 namespace AspNetDesignPatterns.Api.Features.Library;
 
 /// <summary>
-/// The Library slice's data access — its "client" layer, the database counterpart of
-/// <c>IWeatherClient</c>: SQL in, rows out, and failures surface as a <see cref="DbException"/>
-/// for the handler to turn into a <see cref="Result"/>. No business rules live here.
+/// The Library slice's gateway to its database: the counterpart of <c>IWeatherClient</c>. SQL
+/// in, rows out, and failures surface as a <see cref="DbException"/> for
+/// <see cref="ILibraryService"/> to turn into a <see cref="Result"/>.
 /// </summary>
 /// <remarks>
-/// Handlers depend on this interface, the same way they depend on any other service, so the
-/// DI shape matches the rest of the repo. Tests still run against the real
-/// <see cref="LibraryRepository"/> on in-memory SQLite: the SQL, the transaction and the
-/// constraints are what they need to prove, and a substitute would fake those away.
-/// Every method uses the request's <see cref="KAM.Common.Data.IUnitOfWork"/>, so calls made inside
-/// <c>ExecuteInTransactionAsync</c> share its transaction.
+/// <para>
+/// Each method is <b>one operation</b> on the database (one statement, or one write and a
+/// read-back of what it wrote) with no business branching. Sequencing several operations,
+/// deciding what a missing row means, and drawing the transaction around them are the
+/// service's job.
+/// </para>
+/// <para>
+/// Only <see cref="ILibraryService"/> depends on this interface (an architecture test keeps
+/// handlers off it). Tests run the real <see cref="LibraryRepository"/> on in-memory SQLite: the
+/// SQL, the transaction and the constraints are what they need to prove, and a substitute would
+/// fake those away. Every method uses the request's <see cref="KAM.Common.Data.IUnitOfWork"/>, so
+/// calls made inside <c>ExecuteInTransactionAsync</c> share its transaction.
+/// </para>
 /// </remarks>
 internal interface ILibraryRepository
 {
@@ -45,8 +52,11 @@ internal interface ILibraryRepository
     /// <summary>One keyset page of the member's loans, newest first. Pass <c>take = limit + 1</c>.</summary>
     Task<IReadOnlyList<LoanRow>> ListLoansAsync(MemberId member, LoanCursor? after, int take, CancellationToken cancellationToken);
 
-    /// <summary>Closes the loan and puts its copy back on the shelf. Two statements: call inside a transaction.</summary>
-    Task<LoanRow> ReturnLoanAsync(LoanRow loan, DateTimeOffset returnedAt, CancellationToken cancellationToken);
+    /// <summary>Marks the loan returned and returns it. Doesn't touch the book: see <see cref="ReturnCopyAsync"/>.</summary>
+    Task<LoanRow> CloseLoanAsync(int loanId, DateTimeOffset returnedAt, CancellationToken cancellationToken);
+
+    /// <summary>Puts one copy of the book back on the shelf; the counterpart of <see cref="TryTakeCopyAsync"/>.</summary>
+    Task ReturnCopyAsync(int bookId, CancellationToken cancellationToken);
 }
 
 /// <summary>A <c>books</c> row.</summary>

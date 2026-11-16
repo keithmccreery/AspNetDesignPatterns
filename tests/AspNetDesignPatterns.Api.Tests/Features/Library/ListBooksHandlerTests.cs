@@ -6,6 +6,7 @@ using KAM.Common.Results;
 
 namespace AspNetDesignPatterns.Api.Tests.Features.Library;
 
+/// <summary>Paging and search end to end: the handler's cursor over the repository's keyset SQL.</summary>
 [TestFixture]
 public class ListBooksHandlerTests
 {
@@ -117,20 +118,5 @@ public class ListBooksHandlerTests
 
         // Assert
         titles.Should().Equal("100% Pure|An Author");
-    }
-
-    [Test]
-    public async Task A_database_failure_becomes_DatabaseUnavailable()
-    {
-        // Arrange
-        using LibraryTestDatabase down = await LibraryTestDatabase.CreateAsync(connectionFactory: new UnavailableDatabase());
-
-        // Act
-        Result<CursorPage<BookResponse>> result =
-            await down.SendAsync<ListBooksRequest, CursorPage<BookResponse>>(new ListBooksRequest(null, null, null));
-
-        // Assert
-        result.Error.Code.Should().Be(LibraryErrors.DatabaseUnavailable.Code);
-        result.Error.Exception.Should().NotBeNull();
     }
 }

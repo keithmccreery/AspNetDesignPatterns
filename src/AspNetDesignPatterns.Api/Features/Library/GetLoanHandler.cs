@@ -1,5 +1,3 @@
-using System.Data.Common;
-
 using KAM.Common.Handlers;
 
 namespace AspNetDesignPatterns.Api.Features.Library;
@@ -7,20 +5,11 @@ namespace AspNetDesignPatterns.Api.Features.Library;
 /// <summary>One of the caller's loans, or <see cref="LibraryErrors.LoanNotFound"/>.</summary>
 internal sealed class GetLoanHandler : IRequestHandler<GetLoanRequest, LoanResponse>
 {
-    private readonly ILibraryRepository _repository;
+    private readonly ILibraryService _library;
 
-    public GetLoanHandler(ILibraryRepository repository) => _repository = repository;
+    public GetLoanHandler(ILibraryService library) => _library = library;
 
-    public async Task<Result<LoanResponse>> HandleAsync(GetLoanRequest request, CancellationToken cancellationToken)
-    {
-        try
-        {
-            LoanRow? loan = await _repository.GetLoanAsync(request.LoanId, request.Member, cancellationToken);
-            return loan is null ? LibraryErrors.LoanNotFound : LoanResponse.From(loan);
-        }
-        catch (DbException ex)
-        {
-            return LibraryErrors.DatabaseUnavailable.WithException(ex).WithContext(new { request.LoanId });
-        }
-    }
+    public Task<Result<LoanResponse>> HandleAsync(GetLoanRequest request, CancellationToken cancellationToken) =>
+        _library.GetLoanAsync(request.LoanId, request.Member, cancellationToken)
+            .MapAsync(loan => LoanResponse.From(loan));
 }

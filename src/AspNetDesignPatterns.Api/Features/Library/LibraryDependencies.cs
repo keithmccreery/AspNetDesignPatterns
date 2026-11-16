@@ -9,8 +9,8 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 namespace AspNetDesignPatterns.Api.Features.Library;
 
 /// <summary>
-/// Library-feature DI: the SQLite connection factory, the unit of work, the repository, schema
-/// migration at startup, and the database readiness check. Discovered via <see cref="IDependency"/>.
+/// Library-feature DI: the SQLite connection factory, the unit of work, the repository and
+/// service, schema migration at startup, and the database readiness check. Discovered via <see cref="IDependency"/>.
 /// </summary>
 internal sealed class LibraryDependencies : IDependency
 {
@@ -22,6 +22,7 @@ internal sealed class LibraryDependencies : IDependency
         services.TryAddSingleton<IDbConnectionFactory, SqliteConnectionFactory>();
         services.AddUnitOfWork();
         services.AddScoped<ILibraryRepository, LibraryRepository>();
+        services.AddScoped<ILibraryService, LibraryService>();
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddHostedService<LibraryDatabaseInitializer>();
