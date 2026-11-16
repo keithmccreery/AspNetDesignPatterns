@@ -22,7 +22,7 @@ namespace AspNetDesignPatterns.Api.Tests.Integration;
 /// Boots the real application in memory with two seams: deterministic JWT settings and a
 /// substitute <see cref="IWeatherClient"/> so tests never touch the network.
 /// </summary>
-public sealed class WeatherApiFactory : WebApplicationFactory<Program>
+public sealed class ApiFactory : WebApplicationFactory<Program>
 {
     private const string API_V1 = "/api/v1";
 

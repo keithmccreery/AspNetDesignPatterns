@@ -17,7 +17,7 @@ public class WeatherEndpointTests
 {
     private const string VALID_ROUTE = "/api/v1/weather/forecast?latitude=52.5&longitude=13.4&days=2";
 
-    private static WeatherApiFactory Factory => GlobalTestSetup.Factory;
+    private static ApiFactory Factory => GlobalTestSetup.Factory;
 
     [SetUp]
     public void ResetSubstitute() => Factory.WeatherClient.ClearSubstitute();
