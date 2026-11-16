@@ -1,7 +1,6 @@
 using FluentValidation;
 
 using KAM.Common.DependencyInjection;
-using KAM.Common.Handlers;
 using KAM.Common.Pipeline;
 
 using Microsoft.Extensions.Diagnostics.HealthChecks;

@@ -63,7 +63,7 @@ Optional: `docker compose up -d` runs a local OTLP collector (.NET Aspire Dashbo
   pipeline steps.
 - **Cross-cutting building blocks** (in `KAM.Common`) — one top-level folder per concern
   (`Results/`, `Pipeline/`, `Authentication/`, `Authorization/`, `Cors/`, `HealthChecks/`,
-  `OpenApi/`, `Logging/`, `FluentValidations/`, `Configuration/`, `Handlers/`, `Telemetry/`,
+  `OpenApi/`, `Logging/`, `FluentValidations/`, `Configuration/`, `Telemetry/`,
   `Data/`, `Pagination/`),
   each with a README. Infrastructure that is genuinely cross-cutting (auth, CORS, OpenAPI,
   health checks, telemetry) *is* wired in `Program.cs`; only *feature* registration goes

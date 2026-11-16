@@ -1,4 +1,4 @@
-using KAM.Common.Handlers;
+using KAM.Common.DependencyInjection;
 using KAM.Common.Pagination;
 
 using Microsoft.Extensions.Options;

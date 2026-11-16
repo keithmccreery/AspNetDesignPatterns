@@ -1,4 +1,4 @@
-using KAM.Common.Handlers;
+using KAM.Common.DependencyInjection;
 
 namespace AspNetDesignPatterns.Api.Features.Library;
 

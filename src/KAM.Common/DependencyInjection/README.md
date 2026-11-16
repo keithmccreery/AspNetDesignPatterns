@@ -14,7 +14,7 @@ it, and — where the contract has a shape of its own to explain — its `Settin
 | `Endpoints/` | `IEndpoint` — `void MapEndpoint(IEndpointRouteBuilder app)` | `EndpointRegistration`: `AddEndpoints()`, `MapEndpoints()` |
 | `Settings/` | `ISettings` (scan marker), `ISettingsSection` (`static abstract Section`), `SettingsBase<T>`, `SettingsValidateOptions<T>` | `SettingsRegistration`: `AddSettings()` |
 | `Dependencies/` | `IDependency` — `void RegisterServices(IServiceCollection services)` | `DependencyRegistration`: `AddDependencies()` |
-| `RequestHandlers/` | (contract is `IRequestHandler<,>`, in `../Handlers/`) | `RequestHandlerRegistration`: `AddRequestHandlers()` |
+| `RequestHandlers/` | `IRequestHandler<in TRequest, TResponse>` — `Task<Result<TResponse>> HandleAsync(TRequest, CancellationToken)` | `RequestHandlerRegistration`: `AddRequestHandlers()` |
 | `ExceptionHandling/` | `GlobalExceptionHandler` (`IExceptionHandler`) | `ExceptionHandlingRegistration`: `AddGlobalExceptionHandler()` |
 
 Plus `AssemblyTypeScanning.cs` at the top level — the one "find concrete types in these
@@ -24,7 +24,7 @@ assemblies" step all five registration extensions above (and `../Pipeline/`'s
 The registration extensions live in namespace `Microsoft.Extensions.DependencyInjection` (so
 they surface on `IServiceCollection` without an extra `using`); `IDE0130` is suppressed on
 those files on purpose. The contracts themselves (`IEndpoint`, `ISettings`, `IDependency`,
-`SettingsBase<T>`, …) stay in `KAM.Common.DependencyInjection` regardless of
+`IRequestHandler<,>`, `SettingsBase<T>`, …) stay in `KAM.Common.DependencyInjection` regardless of
 which subfolder they live in — the subfolder is filing, not a namespace boundary.
 
 ## The scans (all in `Program.cs`, one line each)
@@ -122,6 +122,29 @@ properties (`TotalRequestTimeout > AttemptTimeout`) or needs more than an attrib
 The configuration binder *appends* to a collection that already has items, so a non-empty
 initializer can never be narrowed from config — default collections to `[]` and apply the
 real default where the value is used (see `Cors/README.md` for the bug this caused).
+
+## `IRequestHandler<TRequest, TResponse>`
+
+One request type, one response, always a `Result<T>`. The endpoint resolves the closed
+interface from DI and delegates straight to it, so it stays a pure HTTP adapter (bind,
+validate, translate the `Result`); the handler holds the use case (often via a
+[pipeline](../Pipeline/README.md)) and is unit-testable without a web host.
+
+```csharp
+app.MapGet("/library/books/{bookId:int}", async (
+    [AsParameters] GetBookRequest request,
+    IRequestHandler<GetBookRequest, BookResponse> handler,
+    ILogger<GetBookEndpoint> logger,
+    CancellationToken cancellationToken) =>
+        await handler.HandleAsync(request, cancellationToken)
+            .LogOnFailureAsync(logger, operation: "GetLibraryBook")
+            .ToHttpResultAsync());
+```
+
+**Deliberately not a mediator.** There's no `IMediator` / `ISender` indirection: the endpoint
+asks for the exact handler interface it needs. The reflection scan already gives "no wiring per
+feature"; a dispatcher would add a runtime lookup and hide the dependency. Concrete handlers are
+tested per feature (e.g. `Features/Weather/GetForecastHandlerTests.cs`).
 
 ## Adding a feature
 

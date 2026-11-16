@@ -1,4 +1,4 @@
-namespace KAM.Common.Handlers;
+namespace KAM.Common.DependencyInjection;
 
 /// <summary>
 /// Handles one request type and produces one response, always as a <see cref="Result{T}"/>.

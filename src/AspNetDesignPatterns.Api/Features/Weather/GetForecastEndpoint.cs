@@ -1,6 +1,5 @@
 using KAM.Common.DependencyInjection;
 using KAM.Common.FluentValidations;
-using KAM.Common.Handlers;
 
 namespace AspNetDesignPatterns.Api.Features.Weather;
 

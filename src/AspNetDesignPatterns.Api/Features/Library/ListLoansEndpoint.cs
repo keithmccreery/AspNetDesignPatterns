@@ -1,6 +1,5 @@
 using KAM.Common.DependencyInjection;
 using KAM.Common.FluentValidations;
-using KAM.Common.Handlers;
 using KAM.Common.Pagination;
 
 namespace AspNetDesignPatterns.Api.Features.Library;
