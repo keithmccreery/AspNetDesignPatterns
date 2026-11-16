@@ -15,7 +15,7 @@ Both are **anonymous**, both are **hidden from the OpenAPI document**, both sit 
 | File | Type | Purpose |
 |---|---|---|
 | `HealthCheckTag.cs` | `static class` | `HealthCheckTag.Ready` — the tag `/health/ready` filters on. No `Live` equivalent: liveness runs zero checks, so nothing would ever read it. |
-| `HealthCheckResponseWriter.cs` | `static` writer | Serializes a `HealthReport` to `{ status, totalDurationMs, entries: { name: { status, durationMs, description, error, tags } } }` using the app's shared `JsonSerializerOptions`. `description`/`error` (exception **message**, never a stack trace) are included only outside Production — both routes are anonymous, so a hand-written check `Description` or an `Exception.Message` (hostname, port, connection-string fragment) must not reach an unauthenticated caller in Production. |
+| `HealthCheckResponseWriter.cs` | `static` writer | Serializes a `HealthReport` to `{ status, totalDurationMs, entries: { name: { status, durationMs, description, error, tags } } }` using the app's shared `JsonSerializerOptions`. `description`/`error` (exception **message**, never a stack trace) are included only when `MapAppHealthChecks(includeDetails: …)` says so — the app passes `!app.Environment.IsProduction()`, so the policy lives in `Program.cs`, not in this writer. Both routes are anonymous, so a hand-written check `Description` or an `Exception.Message` (hostname, port, connection-string fragment) must not reach an unauthenticated caller in Production. |
 | `HealthCheckExtensions.cs` | `MapAppHealthChecks()` | Maps the two routes with the tag predicates and the response writer. |
 
 ## Wiring
@@ -25,7 +25,7 @@ Both are **anonymous**, both are **hidden from the OpenAPI document**, both sit 
 builder.Services.AddHealthChecks();
 
 // Program.cs — endpoints
-app.MapAppHealthChecks();
+app.MapAppHealthChecks(includeDetails: !app.Environment.IsProduction());
 ```
 
 Individual checks self-register from the slice that owns them — they are **not** listed in a
@@ -52,8 +52,12 @@ services.AddHealthChecks().AddCheck<WeatherProviderHealthCheck>(
   credentials, so without a cache every request to it would drive one outbound call to
   open-meteo. `WeatherProviderHealthCheck` caches its result for 15s via `IMemoryCache`
   (`builder.Services.AddMemoryCache()` in `Program.cs`) — cheap insurance, and readiness
-  doesn't need fresher-than-a-few-seconds data anyway. A check with no external call (most of
-  them) doesn't need this.
+  doesn't need fresher-than-a-few-seconds data anyway. It caches the **in-flight probe
+  `Task`**, run on no caller's token: callers arriving mid-probe share it, and a caller that
+  disconnects only stops waiting (`WaitAsync`) rather than cancelling the probe and caching a
+  false `Degraded`. `IMemoryCache` takes no lock, so two callers missing in the same instant can
+  still each start one — `HybridCache` closes that if it ever matters. A check with no external
+  call (most of them) doesn't need this.
 - **No third-party UI package.** `HealthCheckResponseWriter` is ~40 lines and gives full
   control of the shape; `AspNetCore.HealthChecks.UI.Client` would be the drop-in alternative
   if a dashboard needs its exact schema.
@@ -61,11 +65,12 @@ services.AddHealthChecks().AddCheck<WeatherProviderHealthCheck>(
 ## Tests
 
 - `tests/KAM.Common.Tests/HealthChecks/HealthCheckResponseWriterTests.cs` — the JSON shape from a
-  synthetic `HealthReport`, and that `description`/`error` are present outside Production and
-  omitted in Production.
+  synthetic `HealthReport`, and that `description`/`error` are present with `includeDetails: true`
+  and omitted with `false`.
 - `tests/…/Features/Weather/WeatherProviderHealthCheckTests.cs` — Healthy on 2xx, Degraded on
-  an error status or an unreachable host (fake `HttpMessageHandler`), and that a second probe
-  within the cache window doesn't call the provider again.
+  an error status or an unreachable host (fake `HttpMessageHandler`), that a second probe
+  within the cache window doesn't call the provider again, that concurrent callers share one
+  in-flight probe, and that a caller cancelling mid-probe doesn't poison the cached result.
 - `tests/…/Integration/HealthCheckEndpointsTests.cs` — the real app: `/health/live` runs no
   checks, `/health/ready` runs the `ready`-tagged checks, neither appears in the OpenAPI doc.
   The integration factory stubs the weather probe's `HttpClient` so readiness is deterministic.

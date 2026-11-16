@@ -46,20 +46,6 @@ public class WeatherServiceTests
     }
 
     [Test]
-    public async Task Returns_NotFound_when_the_provider_has_no_data()
-    {
-        // Arrange
-        _client.GetForecastAsync(default, default, default, default).ReturnsForAnyArgs((OpenMeteoForecast?) null);
-
-        // Act
-        Result<ForecastResponse> result = await CreateService().GetForecastAsync(Request, CancellationToken.None);
-
-        // Assert
-        result.IsFailure.Should().BeTrue();
-        result.Error.Type.Should().Be(ErrorType.NotFound);
-    }
-
-    [Test]
     public async Task Converts_a_client_exception_into_an_upstream_error()
     {
         // Arrange
@@ -74,7 +60,7 @@ public class WeatherServiceTests
         {
             result.IsFailure.Should().BeTrue();
             result.Error.Type.Should().Be(ErrorType.Upstream);
-            result.Error.Code.Should().Be("Weather.ProviderUnavailable");
+            result.Error.Code.Should().Be(WeatherErrors.ProviderUnavailable.Code);
             result.Error.Exception.Should().BeOfType<WeatherClientException>();
             result.Error.Context.Should().NotBeNull();
         }

@@ -1,9 +1,9 @@
-using System.Security.Claims;
 using System.Text;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
 namespace KAM.Common.Authentication;
@@ -43,8 +43,11 @@ public static class AuthExtensions
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SigningKey)),
                     ValidateLifetime = jwt.ValidateLifetime,
                     ClockSkew = TimeSpan.FromSeconds(jwt.ClockSkewSeconds),
-                    NameClaimType = jwt.NameClaimType ?? ClaimTypes.Name,
-                    RoleClaimType = jwt.RoleClaimType ?? ClaimTypes.Role,
+                    // MapInboundClaims = false keeps claim types exactly as the token sends them, so
+                    // the defaults must be the raw JWT names, not the ClaimTypes.* WS-Fed URIs (which
+                    // only exist after inbound mapping). "roles" is what Entra ID and most IdPs emit.
+                    NameClaimType = jwt.NameClaimType ?? JwtRegisteredClaimNames.Name,
+                    RoleClaimType = jwt.RoleClaimType ?? JwtOptions.DefaultRoleClaimType,
                 };
 
                 // Observability: these fire on every request, so they log at Debug/Warning, not

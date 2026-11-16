@@ -74,8 +74,10 @@ Optional: `docker compose up -d` runs a local OTLP collector (.NET Aspire Dashbo
   `AddPolicyDrivenAuthorization()`). See `Authorization/README.md` for a real bug this
   surfaced: a policy *name* containing `:` doesn't survive `IConfiguration` binding (`:` is its
   own path separator), so policy names and OAuth2 scope values (which use `:` freely) must stay
-  separate constants — same principle as `Authentication/AuthorizationPolicies.cs` already
-  documented, now with a concrete failure mode behind it.
+  separate constants (e.g. `WeatherPolicies` / `WeatherScopes` in
+  `Features/Weather/WeatherAuthorization.cs`). Those constants belong to the feature slice,
+  never `KAM.Common` — the library holds the mechanism, the app owns its policies and scopes
+  (dev-token scopes come from `Jwt:DevTokenScopes` in `appsettings.Development.json`).
 - **`DependencyInjection/`** (in `KAM.Common`) — the reflection-registration conventions, one
   folder per concern (`Endpoints/`, `Settings/`, `Dependencies/`, `RequestHandlers/`,
   `ExceptionHandling/`) — see its README. **Every scan takes an explicit
@@ -100,7 +102,8 @@ Optional: `docker compose up -d` runs a local OTLP collector (.NET Aspire Dashbo
    shape.
 3. **No new registration in `Program.cs` per feature.** Add an `IEndpoint`, `IRequestHandler`,
    `SettingsBase<T>`, `IPipelineStep<>`, or an `IDependency` module — the scans pick it up.
-4. **Settings** = a `SettingsBase<T>` subclass with `public static string Section`. It
+4. **Settings** = `class XOptions : SettingsBase<XOptions>, ISettingsSection` with
+   `public static string Section` (a missing `Section` is a build error). It
    self-registers, binds, and validates on startup (FluentValidation if a validator exists,
    else DataAnnotations).
 5. **Secrets** come from `.env` (`Jwt__SigningKey`), never a committed `appsettings.json`.
@@ -132,7 +135,9 @@ framework first.
   analyzer rule is advisory, but the codebase has zero `var`; use target-typed `new()` when
   the type is on the left). For a `throws`-assertion lambda use `Func<T>`, not `Action`, so
   the constructed instance is still "used" (avoids CA1806).
-- **No primary constructors** — team preference; classic constructors with explicit fields.
+- **Prefer standard constructors over primary constructors** — team preference; classic
+  constructors with explicit fields for new code. Existing primary constructors are not
+  flagged and needn't be rewritten just to comply.
 - Non-public `const` → `SCREAMING_CASE`; `public const` → PascalCase (BCL convention).
 - Trailing newline on every file.
 - Test names: `Method_under_test_expected_behaviour` (underscores OK in test project).

@@ -20,7 +20,11 @@ using KAM.Common.Logging;
 using KAM.Common.OpenApi;
 using KAM.Common.Telemetry;
 
+using Microsoft.Extensions.Options;
+
 using Serilog;
+
+using HttpJsonOptions = Microsoft.AspNetCore.Http.Json.JsonOptions;
 
 // Load .env into environment variables before configuration is built, so values like
 // Jwt__SigningKey are picked up by the default environment-variables configuration source.
@@ -37,7 +41,7 @@ builder.Host.UseDefaultServiceProvider(options =>
     options.ValidateScopes = true;
 });
 
-// "Where and how am I running" — built once, used for Kestrel + Scalar gating, then shared.
+// "Where and how am I running" — built once and shared, for code that branches on it.
 AppEnvironment appEnvironment = new(builder.Environment);
 builder.Services.AddSingleton(appEnvironment);
 
@@ -57,35 +61,26 @@ string? telemetryServiceVersion = TelemetryExtensions.ResolveServiceVersion(tele
 builder.Services.AddGlobalExceptionHandler();
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
 {
+    // RFC 9457: "instance" is a URI reference identifying this occurrence -- the request path
+    // (PathBase included, so it's right behind a path-prefixing proxy), not "GET /path".
     context.ProblemDetails.Instance ??=
-        $"{context.HttpContext.Request.Method} {context.HttpContext.Request.Path}";
+        $"{context.HttpContext.Request.PathBase}{context.HttpContext.Request.Path}";
     context.ProblemDetails.Extensions["traceId"] =
         System.Diagnostics.Activity.Current?.Id ?? context.HttpContext.TraceIdentifier;
 });
 
-// One System.Text.Json configuration, shared by Minimal API (de)serialization and typed clients.
-JsonSerializerOptions jsonOptions = CreateJsonSerializerOptions();
-builder.Services.AddSingleton(jsonOptions);
-builder.Services.ConfigureHttpJsonOptions(options =>
-{
-    options.SerializerOptions.PropertyNamingPolicy = jsonOptions.PropertyNamingPolicy;
-    options.SerializerOptions.PropertyNameCaseInsensitive = jsonOptions.PropertyNameCaseInsensitive;
-    options.SerializerOptions.DefaultIgnoreCondition = jsonOptions.DefaultIgnoreCondition;
-    options.SerializerOptions.WriteIndented = jsonOptions.WriteIndented;
-    foreach (JsonConverter converter in jsonOptions.Converters)
-    {
-        options.SerializerOptions.Converters.Add(converter);
-    }
-});
+// One System.Text.Json configuration: ConfigureJsonSerializer() configures the framework's own
+// Minimal API instance, and that *same instance* is what anything injecting
+// JsonSerializerOptions (typed clients, the health-check writer) receives -- no second copy to
+// keep in sync, so a setting added in ConfigureJsonSerializer() can't silently miss one side.
+builder.Services.ConfigureHttpJsonOptions(options => ConfigureJsonSerializer(options.SerializerOptions));
+builder.Services.AddSingleton(services => services.GetRequiredService<IOptions<HttpJsonOptions>>().Value.SerializerOptions);
 
-// Kestrel: listen on all interfaces when containerized (or anywhere but local dev).
-builder.WebHost.ConfigureKestrel(options =>
-{
-    if (appEnvironment.IsContainerized || !appEnvironment.IsDevelopment)
-    {
-        options.ListenAnyIP(8080);
-    }
-});
+// No Kestrel port in code: the platform decides. Locally that's launchSettings.json; the .NET
+// container images set ASPNETCORE_HTTP_PORTS=8080; App Service sets its own port variables. A
+// hard-coded ListenAnyIP() here would override all of them. Behind a TLS-terminating proxy
+// (App Service, a load balancer), set ASPNETCORE_FORWARDEDHEADERS_ENABLED=true in that
+// environment so the original scheme and client IP survive the hop -- see README "Deploying".
 
 // Serilog becomes the ILoggerFactory; the rest of the app depends only on ILogger<T>.
 // The ControlCharacterSanitizingEnricher strips CR/LF from every event (CWE-117 log injection).
@@ -172,8 +167,8 @@ builder.Services.AddMemoryCache();
 // (the calling assembly, i.e. this one) would silently miss KAM.Common's half.
 Assembly[] appAssemblies = [typeof(Program).Assembly, typeof(IEndpoint).Assembly];
 
-// FluentValidation validators — MUST be registered before AddSettings() so SettingsBase<T>
-// can detect them and choose the FluentValidation path over DataAnnotations.
+// FluentValidation validators (request models and settings). Order relative to AddSettings()
+// doesn't matter: SettingsBase<T> picks FluentValidation vs DataAnnotations when validation runs.
 builder.Services.AddValidatorsFromAssemblies(appAssemblies, includeInternalTypes: true);
 
 // ── Convention-based registration (one assembly scan each) ──
@@ -201,7 +196,8 @@ app.UseAuthorization();
 app.MapApiReference(title: "AspNetDesignPatterns API", theme: "Mars");
 
 // Liveness + readiness probes at /health/live and /health/ready (root, unversioned, anonymous).
-app.MapAppHealthChecks();
+// Check descriptions/exception messages are omitted in Production: the probes are anonymous.
+app.MapAppHealthChecks(includeDetails: !app.Environment.IsProduction());
 
 // All feature endpoints live under the versioned group: /api/v1/...
 ApiVersionSet apiVersionSet = app
@@ -220,18 +216,16 @@ app.Run();
 
 // ───────────────────────────────  Methods  ───────────────────────────
 
-// The single source of truth for JSON serialization across the app.
-static JsonSerializerOptions CreateJsonSerializerOptions()
+// The single source of truth for JSON serialization across the app. Applied on top of the
+// framework's JsonSerializerDefaults.Web instance (camelCase, case-insensitive reads, numbers
+// readable from strings); set here only what differs from or must be pinned beyond that.
+static void ConfigureJsonSerializer(JsonSerializerOptions options)
 {
-    JsonSerializerOptions options = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        WriteIndented = false,
-    };
+    options.PropertyNameCaseInsensitive = true;
+    options.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+    options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+    options.WriteIndented = false;
     options.Converters.Add(new JsonStringEnumConverter());
-    return options;
 }
 
 /// <summary>Exposed so the test project's <c>WebApplicationFactory&lt;Program&gt;</c> can boot the app.</summary>

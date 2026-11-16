@@ -7,10 +7,10 @@ namespace KAM.Common.Tests.DependencyInjection.Settings;
 /// <summary>
 /// Tests the reflection scan itself (<see cref="ISettings"/> discovery). The binding/validation
 /// behaviour a discovered type gets is <see cref="SettingsBaseTests"/>'s concern — which is also
-/// what these tests lean on: this assembly already has an intentionally-invalid <c>ISettings</c>
-/// fixture there (<see cref="SettingsBaseTests.NoSectionSettings"/>, which fails fast by design),
-/// so rather than add another fixture and depend on reflection's enumeration order, these use
-/// that existing one as the proof.
+/// what these tests lean on: this assembly already has intentionally-invalid <c>ISettings</c>
+/// fixtures there (<c>EmptySectionSettings</c>, <c>MisnamedSettings</c>), which fail fast by
+/// design. Which one the scan hits first depends on reflection's enumeration order, so the
+/// assertion accepts either — what matters is that the scan found one.
 /// </summary>
 [TestFixture]
 public class SettingsRegistrationTests
@@ -25,7 +25,7 @@ public class SettingsRegistrationTests
         Action act = () => services.AddSettings(ThisAssembly);
 
         // Assert
-        act.Should().Throw<InvalidOperationException>().WithMessage("*NoSectionSettings*");
+        act.Should().Throw<InvalidOperationException>().Which.Message.Should().ContainAny("EmptySectionSettings", "MisnamedSettings");
     }
 
     [Test]
@@ -42,6 +42,6 @@ public class SettingsRegistrationTests
         Action act = () => services.AddSettings();
 
         // Assert
-        act.Should().Throw<InvalidOperationException>().WithMessage("*NoSectionSettings*");
+        act.Should().Throw<InvalidOperationException>().Which.Message.Should().ContainAny("EmptySectionSettings", "MisnamedSettings");
     }
 }

@@ -2,12 +2,14 @@ using AspNetDesignPatterns.Api.Features.Weather;
 
 using FluentValidation.TestHelper;
 
+using Microsoft.Extensions.Options;
+
 namespace AspNetDesignPatterns.Api.Tests.Features.Weather;
 
 [TestFixture]
 public class GetForecastRequestValidatorTests
 {
-    private readonly GetForecastRequestValidator _validator = new();
+    private readonly GetForecastRequestValidator _validator = new(Options.Create(new WeatherOptions()));
 
     [Test]
     public void Accepts_a_request_within_range()
@@ -50,5 +52,18 @@ public class GetForecastRequestValidatorTests
 
         // Assert
         result.ShouldHaveValidationErrorFor(x => x.Days);
+    }
+
+    [Test]
+    public void Bounds_days_by_the_configured_maximum_not_a_hard_coded_one()
+    {
+        // Arrange
+        GetForecastRequestValidator validator = new(Options.Create(new WeatherOptions { MaxForecastDays = 7 }));
+
+        // Act
+        TestValidationResult<GetForecastRequest> result = validator.TestValidate(new GetForecastRequest(0, 0, 8));
+
+        // Assert
+        result.ShouldHaveValidationErrorFor(x => x.Days).WithErrorMessage("Days must be between 1 and 7.");
     }
 }

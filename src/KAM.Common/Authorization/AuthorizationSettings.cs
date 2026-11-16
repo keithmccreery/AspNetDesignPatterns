@@ -10,7 +10,7 @@ namespace KAM.Common.Authorization;
 /// See <see cref="AuthorizationExtensions"/> for how this is turned into real policies, and
 /// this folder's README for the "why" and a worked example.
 /// </summary>
-public sealed class AuthorizationSettings : SettingsBase<AuthorizationSettings>
+public sealed class AuthorizationSettings : SettingsBase<AuthorizationSettings>, ISettingsSection
 {
     public static string Section => "Authorization";
 
@@ -68,8 +68,9 @@ public sealed class PolicySettings
     /// <summary>
     /// Names of extra <see cref="Microsoft.AspNetCore.Authorization.IAuthorizationRequirement"/>
     /// types to add, resolved by <see cref="AuthorizationPolicyBuilderExtensions"/>. An unknown
-    /// name is logged and skipped, not a startup failure — this list is configuration, and
-    /// configuration can name a requirement that doesn't (yet) exist in this build.
+    /// name, or one its configuration can't satisfy (e.g. an empty
+    /// <see cref="AuthorizationSettings.AllowedClientIds"/>), fails startup — dropping it would
+    /// leave the policy silently weaker than its configuration says.
     /// </summary>
     public List<string> CustomRequirements { get; init; } = [];
 }

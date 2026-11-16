@@ -18,6 +18,7 @@ public class DevTokenIssuerTests
         Issuer = "https://tests/issuer",
         Audience = "tests-audience",
         AccessTokenMinutes = 30,
+        DevTokenScopes = ["weather:read", "weather:write"],
     };
 
     private static DevTokenIssuer CreateIssuer(TimeProvider? time = null) =>
@@ -36,6 +37,7 @@ public class DevTokenIssuerTests
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SIGNING_KEY)),
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromSeconds(5),
+            NameClaimType = "name",
         };
 
         // Act
@@ -47,7 +49,8 @@ public class DevTokenIssuerTests
             response.TokenType.Should().Be("Bearer");
             validation.IsValid.Should().BeTrue();
             validation.Claims.Should().ContainKey("sub").WhoseValue.Should().Be("alice");
-            validation.Claims.Should().ContainKey("scope").WhoseValue.Should().Be("weather:read");
+            validation.ClaimsIdentity.Name.Should().Be("alice");
+            validation.Claims.Should().ContainKey("scope").WhoseValue.Should().Be("weather:read weather:write");
         }
     }
 

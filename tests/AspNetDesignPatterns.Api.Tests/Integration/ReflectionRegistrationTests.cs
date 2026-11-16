@@ -56,7 +56,6 @@ public class ReflectionRegistrationTests
         // Act & Assert
         scope.ServiceProvider.GetService<IPipelineFactory>().Should().NotBeNull();
         scope.ServiceProvider.GetService<FetchForecastStep>().Should().NotBeNull();
-        scope.ServiceProvider.GetService<ClampForecastWindowStep>().Should().NotBeNull();
         scope.ServiceProvider.GetService<RoundTemperaturesStep>().Should().NotBeNull();
     }
 

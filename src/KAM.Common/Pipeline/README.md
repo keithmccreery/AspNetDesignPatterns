@@ -24,13 +24,15 @@ internal sealed class ForecastContext(GetForecastRequest request)
     public ForecastResponse? Response { get; set; }
 }
 
-// a gate step: don't call next -> the rest of the chain is skipped
-internal sealed class ClampWindowStep(IOptions<WeatherOptions> options) : IPipelineStep<ForecastContext>
+// a gate step: don't call next -> the rest of the chain is skipped. (Illustrative: a check
+// that needs a service, like a quota. A rule on the request's own fields belongs in its
+// FluentValidation validator instead, so every 400 has the same shape.)
+internal sealed class QuotaGateStep(IQuotaService quotas) : IPipelineStep<ForecastContext>
 {
-    public Task<Result> ExecuteAsync(ForecastContext ctx, Func<CancellationToken, Task<Result>> next, CancellationToken ct)
-        => ctx.Request.Days > options.Value.MaxForecastDays
-            ? Task.FromResult(Result.Failure(Error.Validation("Weather.WindowTooLarge", "…")))
-            : next(ct);
+    public async Task<Result> ExecuteAsync(ForecastContext ctx, Func<CancellationToken, Task<Result>> next, CancellationToken ct)
+        => await quotas.HasRemainingAsync(ct)
+            ? await next(ct)
+            : Result.Failure(Error.Forbidden("Weather.QuotaExceeded", "…"));
 }
 
 // a post-processing step: run AFTER the rest of the chain
@@ -51,7 +53,7 @@ internal sealed class GetForecastHandler(IPipelineFactory factory) : IRequestHan
     {
         var ctx = new ForecastContext(request);
         var pipeline = factory.CreateBuilder<ForecastContext>()
-            .Use<ClampWindowStep>()
+            .Use<QuotaGateStep>()
             .Use<FetchStep>()
             .Use<RoundStep>()
             .Build();
@@ -68,6 +70,14 @@ internal sealed class GetForecastHandler(IPipelineFactory factory) : IRequestHan
   from the active request scope, so a step can safely depend on scoped services
   (`DbContext`, request-scoped state).
 - Ordering is the order of `.Use<>()` calls, not an attribute.
+- `Build()` returns an **immutable snapshot** — `Use<>()` on the builder afterwards only affects
+  pipelines built later.
+- Each step's `next` is bound to that step's position: calling it twice (a retry step) runs the
+  rest of the chain twice, it never skips steps.
+- **Spans:** each step gets one. A failed `Result` sets `ActivityStatusCode.Error` + an
+  `error.type` tag (the error code) **only on the step it originated in**; steps that just pass
+  the same failure along stay `Unset`. An exception is recorded (`AddException`) once, on the
+  step that threw. So a trace points at where things went wrong, not at every enclosing step.
 
 ## Tests
 

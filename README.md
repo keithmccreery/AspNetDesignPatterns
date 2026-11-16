@@ -54,6 +54,12 @@ dev-token request only succeeds against a host running in the Development enviro
 design (`DevTokenEndpoint` is Development-only), so it'll 404 against an `Azure` host running
 as anything else.
 
+**Deploying**: the app binds no port in code — the platform's own setting wins
+(`ASPNETCORE_HTTP_PORTS`, which the .NET container images default to `8080`; App Service sets its
+own). Behind a TLS-terminating proxy (App Service, a load balancer) also set
+`ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`, so the request's original scheme and client IP survive
+the hop (otherwise logs and redirects see the proxy's).
+
 **Optional — view traces/logs/metrics**: `docker compose up -d` runs a local .NET Aspire
 Dashboard at <http://localhost:18888>; the app's OTLP export already points at it by default.
 Skip this step entirely and the app runs identically — see [`Telemetry/`](src/KAM.Common/Telemetry).
@@ -142,7 +148,7 @@ next to the code. `src/KAM.Common/README.md` and `DependencyInjection/README.md`
 | **Global exception handler** | `IExceptionHandler` + `IProblemDetailsService` turns anything uncaught into a 500 `ProblemDetails` with a trace id. | [`DependencyInjection/ExceptionHandling/GlobalExceptionHandler.cs`](src/KAM.Common/DependencyInjection/ExceptionHandling/GlobalExceptionHandler.cs) |
 | **Pipeline pattern** | Middleware-style: each `IPipelineStep<TContext>` gets a `next` delegate — it can short-circuit, or run code after the rest of the chain. Composed per use case via `IPipelineFactory`. | [`Pipeline/`](src/KAM.Common/Pipeline), [`Features/Weather/ForecastPipeline.cs`](src/AspNetDesignPatterns.Api/Features/Weather/ForecastPipeline.cs) |
 | **FluentValidation** | An endpoint filter validates the request model at the HTTP edge; `ValidateAsResult` validates inside a service/pipeline step and returns a `Result`. | [`FluentValidations/ValidationFilter.cs`](src/KAM.Common/FluentValidations/ValidationFilter.cs), [`ValidationResultExtensions.cs`](src/KAM.Common/FluentValidations/ValidationResultExtensions.cs) |
-| **Self-registering settings** | `SettingsBase<T>` binds a settings class to its own `Section` and validates on startup — FluentValidation if a validator is registered, else DataAnnotations. | [`DependencyInjection/Settings/SettingsBase.cs`](src/KAM.Common/DependencyInjection/Settings/SettingsBase.cs), [`WeatherOptions.cs`](src/AspNetDesignPatterns.Api/Features/Weather/WeatherOptions.cs) (FluentValidation), [`Authentication/JwtOptions.cs`](src/KAM.Common/Authentication/JwtOptions.cs) (DataAnnotations) |
+| **Self-registering settings** | `SettingsBase<T>` + `ISettingsSection` binds a settings class to its own `Section` (a `static abstract` member, so a missing one is a build error) and validates on startup — FluentValidation if a validator is registered, else DataAnnotations, chosen when validation runs so registration order doesn't matter. | [`DependencyInjection/Settings/SettingsBase.cs`](src/KAM.Common/DependencyInjection/Settings/SettingsBase.cs), [`WeatherOptions.cs`](src/AspNetDesignPatterns.Api/Features/Weather/WeatherOptions.cs) (FluentValidation), [`Authentication/JwtOptions.cs`](src/KAM.Common/Authentication/JwtOptions.cs) (DataAnnotations) |
 | **Serilog → ILogger** | Config from `appsettings.json`; request logging; the app only ever depends on `ILogger<T>`. | `Program.cs` (`AddSerilog`) |
 | **Log-injection hardening (CWE-117)** | A Serilog enricher strips CR/LF from every scalar log property, globally. | [`Logging/ControlCharacterSanitizingEnricher.cs`](src/KAM.Common/Logging/ControlCharacterSanitizingEnricher.cs), [`LogSanitizer.cs`](src/KAM.Common/Logging/LogSanitizer.cs) |
 | **OpenAPI + Scalar + versioning** | `AddApiVersioning().AddOpenApi()` produces one document per API version; a transformer adds the JWT scheme; the document is served outside Production and Scalar renders it in Development — both anonymous. | `Program.cs`, [`OpenApi/OpenApiExtensions.cs`](src/KAM.Common/OpenApi/OpenApiExtensions.cs) |

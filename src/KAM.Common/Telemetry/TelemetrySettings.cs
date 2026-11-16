@@ -9,7 +9,7 @@ namespace KAM.Common.Telemetry;
 /// call, both of which read <see cref="OtlpEndpoint"/> so one config value drives all three
 /// signals to the same collector.
 /// </summary>
-public sealed class TelemetrySettings : SettingsBase<TelemetrySettings>
+public sealed class TelemetrySettings : SettingsBase<TelemetrySettings>, ISettingsSection
 {
     public static string Section => "Telemetry";
 

@@ -27,21 +27,31 @@ internal sealed class WeatherProviderHealthCheck(HttpClient httpClient, IMemoryC
 
     public Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
-        CancellationToken cancellationToken = default) =>
-        cache.GetOrCreateAsync(CACHE_KEY, async entry =>
+        CancellationToken cancellationToken = default)
+    {
+        // The cache holds the in-flight probe *Task*, not its result, and the probe runs on no
+        // caller's token (its HttpClient's own 5s timeout bounds it). Two consequences:
+        //  - A caller that disconnects mid-probe only stops *waiting* (WaitAsync); the shared
+        //    probe completes and caches the real answer, rather than a "Degraded" caused by
+        //    one client hanging up.
+        //  - Callers arriving while a probe is in flight await the same Task instead of
+        //    starting their own. IMemoryCache takes no lock, so two callers missing in the
+        //    instant before the entry is set can still each start one -- a narrow race, not a
+        //    stampede. (HybridCache is the framework type that closes it entirely.)
+        Task<HealthCheckResult> probe = cache.GetOrCreate(CACHE_KEY, entry =>
         {
-            // GetOrCreateAsync holds a per-key lock across the factory, unlike a bare
-            // TryGetValue + Set pair — a burst of requests landing as the TTL expires shares
-            // one probe instead of each firing its own concurrent outbound call.
             entry.AbsoluteExpirationRelativeToNow = CacheDuration;
-            return await ProbeAsync(cancellationToken);
-        });
+            return ProbeAsync();
+        })!;
 
-    private async Task<HealthCheckResult> ProbeAsync(CancellationToken cancellationToken)
+        return probe.WaitAsync(cancellationToken);
+    }
+
+    private async Task<HealthCheckResult> ProbeAsync()
     {
         try
         {
-            using HttpResponseMessage response = await httpClient.GetAsync(PROBE_PATH, cancellationToken);
+            using HttpResponseMessage response = await httpClient.GetAsync(PROBE_PATH, CancellationToken.None);
 
             return response.IsSuccessStatusCode
                 ? HealthCheckResult.Healthy($"open-meteo responded {response.StatusCode}.")
@@ -49,6 +59,8 @@ internal sealed class WeatherProviderHealthCheck(HttpClient httpClient, IMemoryC
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
+            // With no caller token, a TaskCanceledException here can only be the client's own
+            // timeout -- the provider genuinely didn't answer in time.
             return HealthCheckResult.Degraded("open-meteo is unreachable.", ex);
         }
     }

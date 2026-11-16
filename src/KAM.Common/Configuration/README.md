@@ -12,16 +12,16 @@ A small, eagerly-evaluated view of **"where and how am I running"**, built once 
 ## Usage
 
 ```csharp
-// Program.cs — built before AddApiServices so startup code can branch on it
-var appEnvironment = new AppEnvironment(builder.Environment);
+// Program.cs — built before the container so startup code can branch on it
+AppEnvironment appEnvironment = new(builder.Environment);
 builder.Services.AddSingleton(appEnvironment);
 
-builder.WebHost.ConfigureKestrel(options =>
-{
-    if (appEnvironment.IsContainerized || !appEnvironment.IsDevelopment)
-        options.ListenAnyIP(8080);
-});
+// …then anywhere: inject AppEnvironment and branch on IsContainerized / IsProduction.
 ```
+
+Not for choosing a listening port: the hosting platform already does that
+(`ASPNETCORE_HTTP_PORTS` in the .NET container images, App Service's own variables,
+`launchSettings.json` locally), and binding a port in code would override all of them.
 
 ## Why a type instead of injecting `IHostEnvironment` everywhere
 

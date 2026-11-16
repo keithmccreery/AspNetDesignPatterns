@@ -6,6 +6,7 @@ using KAM.Common.Authorization.Requirements;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace KAM.Common.Tests.Authorization;
 
@@ -124,10 +125,9 @@ public class AuthorizationExtensionsTests
     }
 
     [Test]
-    public async Task A_ValidClientIdRequirement_with_no_allowed_ids_configured_is_skipped_not_thrown()
+    public void A_ValidClientIdRequirement_with_no_allowed_ids_configured_fails_startup()
     {
-        // Arrange — matches this system's "available but unused" convention: a policy that
-        // names a custom requirement it can't yet satisfy is a config warning, not a crash.
+        // Arrange — skipping it would leave a policy that lets every client through.
         AuthorizationSettings settings = new()
         {
             Policies = new Dictionary<string, PolicySettings>
@@ -137,17 +137,17 @@ public class AuthorizationExtensionsTests
             AllowedClientIds = [],
         };
         using ServiceProvider provider = BuildProvider(settings);
-        IAuthorizationPolicyProvider policyProvider = provider.GetRequiredService<IAuthorizationPolicyProvider>();
 
-        // Act
-        AuthorizationPolicy? policy = await policyProvider.GetPolicyAsync("ValidClientId");
+        // Act — building AuthorizationOptions is exactly what ValidateOnStart() forces at startup.
+        Func<AuthorizationOptions> act = () => provider.GetRequiredService<IOptions<AuthorizationOptions>>().Value;
 
         // Assert
-        policy!.Requirements.Should().NotContain(r => r is ValidClientIdRequirement);
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*'ValidClientId'*AllowedClientIds is empty*");
     }
 
     [Test]
-    public async Task An_unknown_custom_requirement_is_skipped_without_throwing()
+    public void An_unknown_custom_requirement_fails_startup()
     {
         // Arrange
         AuthorizationSettings settings = new()
@@ -158,11 +158,13 @@ public class AuthorizationExtensionsTests
             },
         };
         using ServiceProvider provider = BuildProvider(settings);
-        IAuthorizationPolicyProvider policyProvider = provider.GetRequiredService<IAuthorizationPolicyProvider>();
 
-        // Act & Assert
-        Func<Task> act = async () => await policyProvider.GetPolicyAsync("Mystery");
-        await act.Should().NotThrowAsync();
+        // Act — building AuthorizationOptions is exactly what ValidateOnStart() forces at startup.
+        Func<AuthorizationOptions> act = () => provider.GetRequiredService<IOptions<AuthorizationOptions>>().Value;
+
+        // Assert
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*'Mystery'*unknown custom requirement 'SomethingThatDoesNotExist'*");
     }
 
     [Test]

@@ -5,8 +5,8 @@ namespace KAM.Common.Results;
 /// <summary>
 /// Logs the outcome of a <see cref="Result"/> in one call, so a handler or endpoint can do
 /// <c>result.LogOnFailure(logger).ToHttpResult()</c> without an <c>if</c>. Failures are logged
-/// with the <see cref="Error"/>'s <see cref="Error.Exception"/> and <see cref="Error.Context"/>
-/// when present.
+/// as one event carrying the <see cref="Error"/>'s <see cref="Error.Exception"/> and
+/// <see cref="Error.Context"/> when present.
 /// </summary>
 /// <remarks>
 /// <see cref="Error.Context"/> is logged with structured destructuring (<c>{@Context}</c>).
@@ -16,7 +16,26 @@ namespace KAM.Common.Results;
 /// </remarks>
 public static class ResultLoggingExtensions
 {
-    /// <summary>Logs at Error level when <paramref name="result"/> is a failure. Returns it unchanged.</summary>
+    /// <summary>
+    /// The level a failure of this type is logged at. Every failure is logged — the level says
+    /// whose problem it is: <see cref="LogLevel.Error"/> for ours (an upstream outage, an
+    /// unexpected failure: worth alerting on), <see cref="LogLevel.Warning"/> for
+    /// security-relevant or state-related rejections (401/403 — a spike can mean probing or a
+    /// broken client — and 409), and <see cref="LogLevel.Information"/> for the caller's own
+    /// mistakes (400/404), which are routine and would otherwise drown real errors.
+    /// </summary>
+    public static LogLevel ToLogLevel(this ErrorType type) => type switch
+    {
+        ErrorType.Validation or ErrorType.NotFound => LogLevel.Information,
+        ErrorType.Unauthorized or ErrorType.Forbidden or ErrorType.Conflict => LogLevel.Warning,
+        _ => LogLevel.Error, // Upstream, Failure, and any type added later: fail loud
+    };
+
+    /// <summary>
+    /// Logs <paramref name="result"/> when it's a failure, at <see cref="ToLogLevel"/> for its
+    /// <see cref="ErrorType"/>, as a single event (exception and context included). Returns it
+    /// unchanged.
+    /// </summary>
     public static TResult LogOnFailure<TResult>(
         this TResult result,
         ILogger logger,
@@ -29,18 +48,29 @@ public static class ResultLoggingExtensions
         }
 
         Error error = result.Error;
+        LogLevel level = error.Type.ToLogLevel();
 
-        logger.LogError(
-            error.Exception,
-            "{Operation} failed: {ErrorCode} — {ErrorMessage}{ContextSuffix}",
-            operation,
-            error.Code,
-            error.Message,
-            error.Context is null ? string.Empty : " (context attached)");
-
-        if (error.Context is not null)
+        // One event, so filtering on ErrorCode in a log store also finds the context.
+        if (error.Context is null)
         {
-            logger.LogError("{Operation} failure context: {@Context}", operation, error.Context);
+            logger.Log(
+                level,
+                error.Exception,
+                "{Operation} failed: {ErrorCode} — {ErrorMessage}",
+                operation,
+                error.Code,
+                error.Message);
+        }
+        else
+        {
+            logger.Log(
+                level,
+                error.Exception,
+                "{Operation} failed: {ErrorCode} — {ErrorMessage} {@Context}",
+                operation,
+                error.Code,
+                error.Message,
+                error.Context);
         }
 
         return result;
@@ -62,7 +92,7 @@ public static class ResultLoggingExtensions
         return result;
     }
 
-    /// <summary>Logs either outcome — success at <paramref name="successLevel"/>, failure at Error.</summary>
+    /// <summary>Logs either outcome — success at <paramref name="successLevel"/>, failure as <see cref="LogOnFailure{TResult}"/> does.</summary>
     public static TResult LogResult<TResult>(
         this TResult result,
         ILogger logger,

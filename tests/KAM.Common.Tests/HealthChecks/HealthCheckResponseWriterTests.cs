@@ -2,12 +2,10 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 
 using KAM.Common.HealthChecks;
-using KAM.Common.Tests.TestSupport;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Hosting;
 
 namespace KAM.Common.Tests.HealthChecks;
 
@@ -30,19 +28,18 @@ public class HealthCheckResponseWriterTests
         return new HealthReport(entries, HealthStatus.Degraded, TimeSpan.FromMilliseconds(55));
     }
 
-    private static async Task<JsonElement> WriteAndParseAsync(HealthReport report, string environmentName = "Development")
+    private static async Task<JsonElement> WriteAndParseAsync(HealthReport report, bool includeDetails = true)
     {
         ServiceCollection services = new();
         services.AddSingleton(new JsonSerializerOptions(JsonSerializerDefaults.Web)
         {
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull, // matches the app's real shared options
         });
-        services.AddSingleton<IHostEnvironment>(new FakeHostEnvironment(environmentName));
 
         DefaultHttpContext context = new() { RequestServices = services.BuildServiceProvider() };
         context.Response.Body = new MemoryStream();
 
-        await HealthCheckResponseWriter.WriteAsync(context, report);
+        await HealthCheckResponseWriter.WriteAsync(context, report, includeDetails);
 
         context.Response.Body.Seek(0, SeekOrigin.Begin);
         using StreamReader reader = new(context.Response.Body);
@@ -80,12 +77,11 @@ public class HealthCheckResponseWriterTests
         }
     }
 
-    [TestCase("Development")]
-    [TestCase("Staging")]
-    public async Task Includes_the_description_and_exception_message_outside_Production(string environmentName)
+    [Test]
+    public async Task Includes_the_description_and_exception_message_when_details_are_on()
     {
         // Arrange & Act
-        JsonElement json = await WriteAndParseAsync(Report(), environmentName);
+        JsonElement json = await WriteAndParseAsync(Report(), includeDetails: true);
 
         // Assert
         JsonElement entry = json.GetProperty("entries").GetProperty("weather-provider");
@@ -98,11 +94,11 @@ public class HealthCheckResponseWriterTests
     }
 
     [Test]
-    public async Task Omits_the_description_and_exception_message_in_Production()
+    public async Task Omits_the_description_and_exception_message_when_details_are_off()
     {
         // Arrange & Act — /health/ready is anonymous; Exception.Message can carry a hostname,
         // port, or connection-string fragment for a check this file didn't anticipate.
-        JsonElement json = await WriteAndParseAsync(Report(), "Production");
+        JsonElement json = await WriteAndParseAsync(Report(), includeDetails: false);
 
         // Assert
         JsonElement entry = json.GetProperty("entries").GetProperty("weather-provider");
@@ -123,12 +119,11 @@ public class HealthCheckResponseWriterTests
         {
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull, // matches the app's real shared options
         });
-        services.AddSingleton<IHostEnvironment>(new FakeHostEnvironment("Development"));
         DefaultHttpContext context = new() { RequestServices = services.BuildServiceProvider() };
         context.Response.Body = new MemoryStream();
 
         // Act
-        await HealthCheckResponseWriter.WriteAsync(context, Report());
+        await HealthCheckResponseWriter.WriteAsync(context, Report(), includeDetails: true);
 
         // Assert
         context.Response.ContentType.Should().StartWith("application/json");

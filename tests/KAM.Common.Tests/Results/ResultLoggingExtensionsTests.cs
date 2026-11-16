@@ -12,11 +12,30 @@ public class ResultLoggingExtensionsTests
     [SetUp]
     public void SetUp() => _logger = new RecordingLogger();
 
-    [Test]
-    public void LogOnFailure_logs_once_at_Error_and_returns_the_result_unchanged()
+    [TestCase(ErrorType.Validation, LogLevel.Information)]
+    [TestCase(ErrorType.NotFound, LogLevel.Information)]
+    [TestCase(ErrorType.Unauthorized, LogLevel.Warning)]
+    [TestCase(ErrorType.Forbidden, LogLevel.Warning)]
+    [TestCase(ErrorType.Conflict, LogLevel.Warning)]
+    [TestCase(ErrorType.Upstream, LogLevel.Error)]
+    [TestCase(ErrorType.Failure, LogLevel.Error)]
+    public void LogOnFailure_logs_every_failure_at_the_level_for_its_type(ErrorType type, LogLevel expected)
     {
         // Arrange
-        Result<int> result = Result.Failure<int>(Error.NotFound("X.Missing", "not here"));
+        Result result = Result.Failure(new Error("X.Code", "x", type));
+
+        // Act
+        result.LogOnFailure(_logger, operation: "Op");
+
+        // Assert
+        _logger.Entries.Should().ContainSingle().Which.Level.Should().Be(expected);
+    }
+
+    [Test]
+    public void LogOnFailure_logs_once_and_returns_the_result_unchanged()
+    {
+        // Arrange
+        Result<int> result = Result.Failure<int>(Error.Upstream("X.Down", "not here"));
 
         // Act
         Result<int> returned = result.LogOnFailure(_logger, operation: "FindWidget");
@@ -26,7 +45,7 @@ public class ResultLoggingExtensionsTests
         {
             returned.Should().BeSameAs(result);
             _logger.Entries.Should().ContainSingle(e => e.Level == LogLevel.Error);
-            _logger.Entries[0].Message.Should().Contain("FindWidget").And.Contain("X.Missing");
+            _logger.Entries[0].Message.Should().Contain("FindWidget").And.Contain("X.Down");
         }
     }
 
@@ -41,7 +60,7 @@ public class ResultLoggingExtensionsTests
     }
 
     [Test]
-    public void LogOnFailure_logs_the_attached_exception_and_context_separately()
+    public void LogOnFailure_logs_the_attached_exception_and_context_in_one_event()
     {
         // Arrange
         Error error = Error.Upstream("Weather.Down", "unavailable")
@@ -54,9 +73,9 @@ public class ResultLoggingExtensionsTests
         // Assert
         using (new AssertionScope())
         {
-            _logger.Entries.Should().HaveCount(2);
+            _logger.Entries.Should().ContainSingle();
             _logger.Entries[0].Exception.Should().BeOfType<HttpRequestException>();
-            _logger.Entries[1].Message.Should().Contain("context");
+            _logger.Entries[0].Message.Should().Contain("Weather.Down").And.Contain("Berlin");
         }
     }
 

@@ -11,7 +11,6 @@ provider. **Authorization** — what the caller can do — is a separate concern
 | File | Type | Purpose |
 |---|---|---|
 | `JwtOptions.cs` | `SettingsBase<JwtOptions>` | Bound from the `Jwt` config section. `SigningKey` is a secret and comes from `.env` (`Jwt__SigningKey`), never a committed `appsettings.json`. Validated with **DataAnnotations** (`[Required]`, `[MinLength(32)]`, `[Range]`) because it has no FluentValidation validator — the fallback path of `SettingsBase`. |
-| `AuthorizationPolicies.cs` | constants | `AuthorizationPolicies.WeatherRead` (a policy *name*, `"WeatherRead"`) and `Scopes.WeatherRead` (the scope *value*, `"weather:read"`) are deliberately separate constants — see below. `Scopes.Default` is what the dev-token endpoint embeds. |
 | `ScopeClaims.cs` | `ScopeClaims.Has(user, scope)` | Reads a `scope` claim correctly: matches a standard space-delimited claim (what a real IdP sends) *and* a discrete claim per scope. Used by `Authorization/`'s policy config, not just here. |
 | `AuthExtensions.cs` | `AddJwtAuth()` | Registers JWT bearer auth, configures `TokenValidationParameters` lazily from `JwtOptions` (so options `ValidateOnStart` still governs startup), wires `JwtBearerEvents` for authentication observability (failed/validated/challenge, logged at Debug/Warning since they fire on every request), and registers `DevTokenIssuer` + `TimeProvider.System`. **Does not** touch `AddAuthorization` — see `Authorization/`. |
 | `TokenContracts.cs` | `TokenRequest` + `TokenRequestValidator`, `TokenResponse` | Request/response records for the dev-token endpoint, and the validator that keeps an empty `Subject` from reaching `DevTokenIssuer`. |
@@ -23,13 +22,18 @@ provider. **Authorization** — what the caller can do — is a separate concern
 Beyond `SigningKey`/`Issuer`/`Audience`/`AccessTokenMinutes`: `ValidateIssuer`,
 `ValidateAudience`, `ValidateLifetime` (all default `true`), `ClockSkewSeconds` (default `30`,
 range 0–3600), `SaveToken` (default `false`), and optional `NameClaimType`/`RoleClaimType`
-overrides. All of these used to be hardcoded in `AddJwtAuth()` — moving them to config means
+overrides (defaults `name` / `roles` — the raw JWT claim names, because `MapInboundClaims` is
+off; the `ClaimTypes.*` URIs only exist after inbound mapping, so defaulting to them would leave
+`Identity.Name` null and every `RequiredRoles` policy unsatisfiable for a real IdP's token). All of these used to be hardcoded in `AddJwtAuth()` — moving them to config means
 tightening (or, for a test environment, loosening) token validation doesn't need a code change.
 
 ## Why the policy name and the scope value are separate constants
 
-`AuthorizationPolicies.WeatherRead` names the *policy*; `Scopes.WeatherRead` is the *scope
-claim value* the policy's config (`Authorization:Policies:WeatherRead:RequiredScopes` in
+Which policies and scopes exist is the consuming app's business, so their constants live in
+the app's feature slice, not here — e.g. `Features/Weather/WeatherAuthorization.cs`, and the
+scopes a dev token carries come from `Jwt:DevTokenScopes` (set in the app's
+`appsettings.Development.json`). `WeatherPolicies.Read` names the *policy*;
+`WeatherScopes.Read` is the *scope claim value* the policy's config (`Authorization:Policies:WeatherRead:RequiredScopes` in
 `appsettings.json`) checks. They used to share one string when the policy was hardcoded C#;
 now that the policy is config-driven, they **can't** share one — a policy name flows through
 `IConfiguration`, which treats `:` as its own path separator, so a name containing `:` doesn't
@@ -56,7 +60,7 @@ builder.Services.AddPolicyDrivenAuthorization(); // Authorization/ — the named
 
 // an endpoint
 app.MapGet("/weather/forecast", Handler)
-   .RequireAuthorization(AuthorizationPolicies.WeatherRead);
+   .RequireAuthorization(WeatherPolicies.Read); // the slice's own constant
 
 // getting a token in Development
 // POST /api/v1/auth/token  { "subject": "me" }  ->  { "accessToken": "...", "expiresAtUtc": "..." }
