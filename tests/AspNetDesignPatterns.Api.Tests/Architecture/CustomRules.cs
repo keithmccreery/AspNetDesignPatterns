@@ -15,11 +15,19 @@ internal static class CustomRules
     /// <summary>Every public instance method returns <c>Result</c> / <c>Result&lt;T&gt;</c> (optionally wrapped in a task).</summary>
     public static ICustomRule ReturnResult { get; } = new ReturnsResultRule();
 
-    /// <summary>The type contains no <c>throw new …</c>. A bare <c>throw;</c> rethrow is a different opcode and is allowed.</summary>
+    /// <summary>
+    /// The type contains no <c>throw new …</c>. Only a <c>throw</c> of a freshly constructed object
+    /// counts: a bare <c>throw;</c> is a different opcode, and the compiler's own lowering of
+    /// <c>await using</c> and of <c>await</c> inside a <c>catch</c> rethrows a captured exception
+    /// with a plain <c>throw</c> that no source line wrote.
+    /// </summary>
     public static ICustomRule NeverThrow { get; } = new DoesNotThrowRule();
 
-    /// <summary>The type references a production type whose name ends in <c>Service</c> or <c>Client</c>.</summary>
-    public static ICustomRule DependsOnAServiceOrClient { get; } = new DependsOnServiceOrClientRule();
+    /// <summary>
+    /// The type references a production type whose name ends in <c>Service</c>, <c>Client</c> or
+    /// <c>Repository</c> — the layers below a handler.
+    /// </summary>
+    public static ICustomRule DependsOnALayerBelowTheHandler { get; } = new DependsOnLayerBelowHandlerRule();
 
     private sealed class ReturnsResultRule : ICustomRule
     {
@@ -54,16 +62,17 @@ internal static class CustomRules
 
             return ownMethods.Concat(stateMachineMethods)
                 .SelectMany(method => method.Body.Instructions)
-                .All(instruction => instruction.OpCode != OpCodes.Throw);
+                .All(instruction => !(instruction.OpCode == OpCodes.Throw && instruction.Previous?.OpCode == OpCodes.Newobj));
         }
     }
 
-    private sealed class DependsOnServiceOrClientRule : ICustomRule
+    private sealed class DependsOnLayerBelowHandlerRule : ICustomRule
     {
         public bool MeetsRule(TypeDefinition type) => TypesAndNestedHelpers(type)
             .SelectMany(ReferencedTypeNames)
             .Any(name => name.EndsWith("Service", StringComparison.Ordinal)
-                      || name.EndsWith("Client", StringComparison.Ordinal));
+                      || name.EndsWith("Client", StringComparison.Ordinal)
+                      || name.EndsWith("Repository", StringComparison.Ordinal));
 
         private static IEnumerable<TypeDefinition> TypesAndNestedHelpers(TypeDefinition type) =>
             new[] { type }.Concat(type.NestedTypes.Where(IsCompilerGenerated));

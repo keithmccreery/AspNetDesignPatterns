@@ -112,12 +112,12 @@ public class ConventionTests
     }
 
     [Test]
-    public void Endpoints_do_not_reach_past_the_handler_into_services_or_clients()
+    public void Endpoints_do_not_reach_past_the_handler_into_services_clients_or_repositories()
     {
         // Arrange & Act
         TestResult result = ArchitectureRules.InProductionCode()
             .That().ImplementInterface(typeof(IEndpoint))
-            .ShouldNot().MeetCustomRule(CustomRules.DependsOnAServiceOrClient)
+            .ShouldNot().MeetCustomRule(CustomRules.DependsOnALayerBelowTheHandler)
             .GetResult();
 
         // Assert

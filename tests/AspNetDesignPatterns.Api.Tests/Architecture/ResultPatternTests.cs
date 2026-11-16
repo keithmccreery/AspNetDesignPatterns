@@ -1,3 +1,5 @@
+using KAM.Common.Handlers;
+
 using NetArchTest.Rules;
 
 namespace AspNetDesignPatterns.Api.Tests.Architecture;
@@ -29,9 +31,10 @@ public class ResultPatternTests
     [Test]
     public void Request_handlers_return_a_Result_from_every_public_method()
     {
-        // Arrange & Act
+        // Arrange & Act — selected by interface, not by a "Handler" suffix that other kinds of
+        // handler (e.g. Dapper's SqlMapper.TypeHandler) legitimately share.
         TestResult result = FeatureClasses()
-            .And().HaveNameEndingWith("Handler", StringComparison.Ordinal)
+            .And().ImplementInterface(typeof(IRequestHandler<,>))
             .Should().MeetCustomRule(CustomRules.ReturnResult)
             .GetResult();
 
