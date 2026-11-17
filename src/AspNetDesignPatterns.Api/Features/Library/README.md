@@ -246,5 +246,6 @@ in its own DI scope, like a request):
 `tests/…/Integration/LibraryEndpointTests` — through the real host and the database it
 migrated and seeded at startup: 401 without a token; paging the whole catalogue with
 `nextCursor` (50 books, 8 pages, no repeats); explicit `"nextCursor": null`; 400 on a tampered
-cursor; borrow → 201 + `Location` → GET it → return; 409 `ProblemDetails` with `errorCode`;
+cursor and on a search under 3 characters; the OpenAPI document describing `BookId`/`LoanId`
+as plain integers; borrow → 201 + `Location` → GET it → return; 409 `ProblemDetails` with `errorCode`;
 loans private to their member.
