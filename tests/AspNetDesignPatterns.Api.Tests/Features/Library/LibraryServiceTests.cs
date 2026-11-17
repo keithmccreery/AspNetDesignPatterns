@@ -25,10 +25,10 @@ public class LibraryServiceTests
     [TearDown]
     public void TearDown() => _database.Dispose();
 
-    private Task<Result<LoanRow>> BorrowAsync(int bookId, MemberId member) =>
+    private Task<Result<LoanRow>> BorrowAsync(BookId bookId, MemberId member) =>
         _database.CallAsync(library => library.BorrowBookAsync(bookId, member, CancellationToken.None));
 
-    private Task<Result<LoanRow>> ReturnAsync(int loanId, MemberId member) =>
+    private Task<Result<LoanRow>> ReturnAsync(LoanId loanId, MemberId member) =>
         _database.CallAsync(library => library.ReturnLoanAsync(loanId, member, CancellationToken.None));
 
     // ── Borrow ──
@@ -37,7 +37,7 @@ public class LibraryServiceTests
     public async Task Borrowing_takes_a_copy_and_records_a_loan_due_after_the_loan_period()
     {
         // Arrange
-        int bookId = _database.AddBook("Dracula", copies: 3);
+        BookId bookId = _database.AddBook("Dracula", copies: 3);
 
         // Act
         Result<LoanRow> result = await BorrowAsync(bookId, Alice);
@@ -59,7 +59,7 @@ public class LibraryServiceTests
     public async Task Borrowing_an_unknown_book_is_BookNotFound()
     {
         // Act
-        Result<LoanRow> result = await BorrowAsync(999, Alice);
+        Result<LoanRow> result = await BorrowAsync(new BookId(999), Alice);
 
         // Assert
         result.Error.Code.Should().Be(LibraryErrors.BookNotFound.Code);
@@ -70,7 +70,7 @@ public class LibraryServiceTests
     public async Task No_copy_left_is_NoCopiesAvailable_and_changes_nothing()
     {
         // Arrange
-        int bookId = _database.AddBook("Beowulf", copies: 1);
+        BookId bookId = _database.AddBook("Beowulf", copies: 1);
         await BorrowAsync(bookId, Alice);
 
         // Act
@@ -86,7 +86,7 @@ public class LibraryServiceTests
     public async Task Borrowing_a_book_you_already_have_rolls_back_the_copy_it_took()
     {
         // Arrange
-        int bookId = _database.AddBook("Dracula", copies: 3);
+        BookId bookId = _database.AddBook("Dracula", copies: 3);
         await BorrowAsync(bookId, Alice);
 
         // Act — this call takes a copy (3 → 2 → 1) before it finds Alice's open loan
@@ -102,7 +102,7 @@ public class LibraryServiceTests
     public async Task Holding_the_last_copy_yourself_is_AlreadyBorrowed_not_NoCopiesAvailable()
     {
         // Arrange
-        int bookId = _database.AddBook("Beowulf", copies: 1);
+        BookId bookId = _database.AddBook("Beowulf", copies: 1);
         await BorrowAsync(bookId, Alice);
 
         // Act
@@ -118,8 +118,8 @@ public class LibraryServiceTests
     public async Task Returning_closes_the_loan_and_puts_the_copy_back()
     {
         // Arrange
-        int bookId = _database.AddBook("Emma", copies: 1);
-        int loanId = (await BorrowAsync(bookId, Alice)).Value.Id;
+        BookId bookId = _database.AddBook("Emma", copies: 1);
+        LoanId loanId = (await BorrowAsync(bookId, Alice)).Value.Id;
 
         // Act
         Result<LoanRow> result = await ReturnAsync(loanId, Alice);
@@ -133,8 +133,8 @@ public class LibraryServiceTests
     public async Task Returning_twice_is_LoanAlreadyReturned_and_does_not_add_a_copy()
     {
         // Arrange
-        int bookId = _database.AddBook("Emma", copies: 1);
-        int loanId = (await BorrowAsync(bookId, Alice)).Value.Id;
+        BookId bookId = _database.AddBook("Emma", copies: 1);
+        LoanId loanId = (await BorrowAsync(bookId, Alice)).Value.Id;
         await ReturnAsync(loanId, Alice);
 
         // Act
@@ -149,8 +149,8 @@ public class LibraryServiceTests
     public async Task Returning_another_members_loan_is_LoanNotFound_so_its_existence_is_not_revealed()
     {
         // Arrange
-        int bookId = _database.AddBook("Emma", copies: 1);
-        int loanId = (await BorrowAsync(bookId, Alice)).Value.Id;
+        BookId bookId = _database.AddBook("Emma", copies: 1);
+        LoanId loanId = (await BorrowAsync(bookId, Alice)).Value.Id;
 
         // Act
         Result<LoanRow> result = await ReturnAsync(loanId, Bob);
@@ -164,7 +164,7 @@ public class LibraryServiceTests
     public async Task Returning_an_unknown_loan_is_LoanNotFound()
     {
         // Act
-        Result<LoanRow> result = await ReturnAsync(999, Alice);
+        Result<LoanRow> result = await ReturnAsync(new LoanId(999), Alice);
 
         // Assert
         result.Error.Code.Should().Be(LibraryErrors.LoanNotFound.Code);
@@ -176,11 +176,11 @@ public class LibraryServiceTests
     public async Task GetBook_returns_the_book_or_BookNotFound()
     {
         // Arrange
-        int bookId = _database.AddBook("Middlemarch", "George Eliot", copies: 2);
+        BookId bookId = _database.AddBook("Middlemarch", "George Eliot", copies: 2);
 
         // Act
         Result<BookRow> found = await _database.CallAsync(library => library.GetBookAsync(bookId, CancellationToken.None));
-        Result<BookRow> missing = await _database.CallAsync(library => library.GetBookAsync(999, CancellationToken.None));
+        Result<BookRow> missing = await _database.CallAsync(library => library.GetBookAsync(new BookId(999), CancellationToken.None));
 
         // Assert
         found.Value.Should().BeEquivalentTo(new { Title = "Middlemarch", Author = "George Eliot", AvailableCopies = 2 });
@@ -191,7 +191,7 @@ public class LibraryServiceTests
     public async Task GetLoan_returns_only_the_members_own_loan()
     {
         // Arrange
-        int loanId = (await BorrowAsync(_database.AddBook("Emma"), Alice)).Value.Id;
+        LoanId loanId = (await BorrowAsync(_database.AddBook("Emma"), Alice)).Value.Id;
 
         // Act
         Result<LoanRow> own = await _database.CallAsync(library => library.GetLoanAsync(loanId, Alice, CancellationToken.None));
@@ -226,7 +226,7 @@ public class LibraryServiceTests
         using LibraryTestDatabase down = await LibraryTestDatabase.CreateAsync(connectionFactory: new UnavailableDatabase());
 
         // Act
-        Result<LoanRow> result = await down.CallAsync(library => library.BorrowBookAsync(1, Alice, CancellationToken.None));
+        Result<LoanRow> result = await down.CallAsync(library => library.BorrowBookAsync(new BookId(1), Alice, CancellationToken.None));
 
         // Assert
         result.Error.Code.Should().Be(LibraryErrors.DatabaseUnavailable.Code);

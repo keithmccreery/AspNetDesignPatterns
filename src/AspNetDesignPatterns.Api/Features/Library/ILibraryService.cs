@@ -19,7 +19,7 @@ internal interface ILibraryService
     Task<Result<IReadOnlyList<BookRow>>> ListBooksAsync(string? search, BookCursor? after, int take, CancellationToken cancellationToken);
 
     /// <summary>The book, or <see cref="LibraryErrors.BookNotFound"/>.</summary>
-    Task<Result<BookRow>> GetBookAsync(int bookId, CancellationToken cancellationToken);
+    Task<Result<BookRow>> GetBookAsync(BookId bookId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Takes a copy and records a loan due after <see cref="LibraryOptions.LoanPeriod"/>, in one
@@ -27,10 +27,10 @@ internal interface ILibraryService
     /// <see cref="LibraryErrors.AlreadyBorrowed"/> or <see cref="LibraryErrors.NoCopiesAvailable"/>,
     /// leaving the database as it was.
     /// </summary>
-    Task<Result<LoanRow>> BorrowBookAsync(int bookId, MemberId member, CancellationToken cancellationToken);
+    Task<Result<LoanRow>> BorrowBookAsync(BookId bookId, MemberId member, CancellationToken cancellationToken);
 
     /// <summary>The member's loan, or <see cref="LibraryErrors.LoanNotFound"/> (also for someone else's).</summary>
-    Task<Result<LoanRow>> GetLoanAsync(int loanId, MemberId member, CancellationToken cancellationToken);
+    Task<Result<LoanRow>> GetLoanAsync(LoanId loanId, MemberId member, CancellationToken cancellationToken);
 
     /// <summary>One keyset page of the member's loans, newest first. Pass <c>take = limit + 1</c>.</summary>
     Task<Result<IReadOnlyList<LoanRow>>> ListLoansAsync(MemberId member, LoanCursor? after, int take, CancellationToken cancellationToken);
@@ -39,5 +39,5 @@ internal interface ILibraryService
     /// Closes the member's loan and puts its copy back, in one transaction. Fails with
     /// <see cref="LibraryErrors.LoanNotFound"/> or <see cref="LibraryErrors.LoanAlreadyReturned"/>.
     /// </summary>
-    Task<Result<LoanRow>> ReturnLoanAsync(int loanId, MemberId member, CancellationToken cancellationToken);
+    Task<Result<LoanRow>> ReturnLoanAsync(LoanId loanId, MemberId member, CancellationToken cancellationToken);
 }

@@ -31,13 +31,15 @@ internal sealed class LibraryRepository : ILibraryRepository
         int take,
         CancellationToken cancellationToken)
     {
+        // The search is a filter only: books_search (003_books_search.sql) finds the matching
+        // ids, and the order stays (title, id), so the cursor works the same with or without one.
         // (title, id) > (@AfterTitle, @AfterId) is a row-value comparison: "after this exact
         // position", which the (title, id) index can seek to. The id makes the order strict, so
         // two books with the same title are neither skipped nor repeated at a page boundary.
         const string SQL = $"""
             SELECT {BOOK_COLUMNS}
             FROM books
-            WHERE (@Pattern IS NULL OR title LIKE @Pattern ESCAPE '\' OR author LIKE @Pattern ESCAPE '\')
+            WHERE (@Search IS NULL OR id IN (SELECT rowid FROM books_search WHERE books_search MATCH @Search))
               AND (@AfterTitle IS NULL OR (title, id) > (@AfterTitle, @AfterId))
             ORDER BY title, id
             LIMIT @Take;
@@ -45,12 +47,12 @@ internal sealed class LibraryRepository : ILibraryRepository
 
         return [.. await QueryAsync<BookRow>(
             SQL,
-            new { Pattern = ContainsPattern(search), AfterTitle = after?.Title, AfterId = after?.Id, Take = take },
+            new { Search = SearchPhrase(search), AfterTitle = after?.Title, AfterId = after?.Id, Take = take },
             cancellationToken)];
     }
 
     /// <inheritdoc />
-    public async Task<BookRow?> GetBookAsync(int bookId, CancellationToken cancellationToken)
+    public async Task<BookRow?> GetBookAsync(BookId bookId, CancellationToken cancellationToken)
     {
         const string SQL = $"SELECT {BOOK_COLUMNS} FROM books WHERE id = @BookId;";
         DbConnection connection = await _unitOfWork.GetConnectionAsync(cancellationToken);
@@ -58,7 +60,7 @@ internal sealed class LibraryRepository : ILibraryRepository
     }
 
     /// <inheritdoc />
-    public async Task<bool> TryTakeCopyAsync(int bookId, CancellationToken cancellationToken)
+    public async Task<bool> TryTakeCopyAsync(BookId bookId, CancellationToken cancellationToken)
     {
         const string SQL = """
             UPDATE books SET available_copies = available_copies - 1
@@ -68,7 +70,7 @@ internal sealed class LibraryRepository : ILibraryRepository
     }
 
     /// <inheritdoc />
-    public async Task<bool> HasOpenLoanAsync(int bookId, MemberId member, CancellationToken cancellationToken)
+    public async Task<bool> HasOpenLoanAsync(BookId bookId, MemberId member, CancellationToken cancellationToken)
     {
         const string SQL = """
             SELECT EXISTS (
@@ -82,7 +84,7 @@ internal sealed class LibraryRepository : ILibraryRepository
 
     /// <inheritdoc />
     public async Task<LoanRow> InsertLoanAsync(
-        int bookId,
+        BookId bookId,
         MemberId member,
         DateTimeOffset borrowedAt,
         DateTimeOffset dueAt,
@@ -94,7 +96,7 @@ internal sealed class LibraryRepository : ILibraryRepository
             RETURNING id;
             """;
         DbConnection connection = await _unitOfWork.GetConnectionAsync(cancellationToken);
-        int loanId = await connection.ExecuteScalarAsync<int>(Command(
+        LoanId loanId = await connection.ExecuteScalarAsync<LoanId>(Command(
             SQL,
             new { BookId = bookId, MemberId = member.Value, BorrowedAt = borrowedAt, DueAt = dueAt },
             cancellationToken));
@@ -103,7 +105,7 @@ internal sealed class LibraryRepository : ILibraryRepository
     }
 
     /// <inheritdoc />
-    public async Task<LoanRow?> GetLoanAsync(int loanId, MemberId member, CancellationToken cancellationToken)
+    public async Task<LoanRow?> GetLoanAsync(LoanId loanId, MemberId member, CancellationToken cancellationToken)
     {
         const string SQL = $"{LOAN_SELECT} WHERE l.id = @LoanId AND l.member_id = @MemberId;";
         DbConnection connection = await _unitOfWork.GetConnectionAsync(cancellationToken);
@@ -134,7 +136,7 @@ internal sealed class LibraryRepository : ILibraryRepository
     }
 
     /// <inheritdoc />
-    public async Task<LoanRow> CloseLoanAsync(int loanId, DateTimeOffset returnedAt, CancellationToken cancellationToken)
+    public async Task<LoanRow> CloseLoanAsync(LoanId loanId, DateTimeOffset returnedAt, CancellationToken cancellationToken)
     {
         await ExecuteAsync(
             "UPDATE loans SET returned_at = @ReturnedAt WHERE id = @LoanId AND returned_at IS NULL;",
@@ -145,7 +147,7 @@ internal sealed class LibraryRepository : ILibraryRepository
     }
 
     /// <inheritdoc />
-    public Task ReturnCopyAsync(int bookId, CancellationToken cancellationToken) =>
+    public Task ReturnCopyAsync(BookId bookId, CancellationToken cancellationToken) =>
         ExecuteAsync(
             "UPDATE books SET available_copies = available_copies + 1 WHERE id = @BookId;",
             new { BookId = bookId },
@@ -153,7 +155,7 @@ internal sealed class LibraryRepository : ILibraryRepository
 
     // A loan this repository has just written: QuerySingle, so a missing row (which would be a
     // bug) throws here, in the layer allowed to throw, instead of reaching the service as null.
-    private async Task<LoanRow> GetRequiredLoanAsync(int loanId, CancellationToken cancellationToken)
+    private async Task<LoanRow> GetRequiredLoanAsync(LoanId loanId, CancellationToken cancellationToken)
     {
         DbConnection connection = await _unitOfWork.GetConnectionAsync(cancellationToken);
         return await connection.QuerySingleAsync<LoanRow>(
@@ -177,12 +179,12 @@ internal sealed class LibraryRepository : ILibraryRepository
     private CommandDefinition Command(string sql, object parameters, CancellationToken cancellationToken) =>
         new(sql, parameters, _unitOfWork.Transaction, cancellationToken: cancellationToken);
 
-    // User input inside LIKE: escape its own wildcards so "50%" means the text "50%".
-    private static string? ContainsPattern(string? search) =>
+    // User input inside MATCH: FTS5 has its own query language (AND, OR, NOT, NEAR, *, column
+    // filters), so wrap the whole input in double quotes -- doubling any it contains -- to make
+    // it one literal phrase. "100%" then means the text "100%", and "pride and" those words in
+    // that order, anywhere in the title or author.
+    private static string? SearchPhrase(string? search) =>
         string.IsNullOrWhiteSpace(search)
             ? null
-            : "%" + search.Trim()
-                .Replace(@"\", @"\\", StringComparison.Ordinal)
-                .Replace("%", @"\%", StringComparison.Ordinal)
-                .Replace("_", @"\_", StringComparison.Ordinal) + "%";
+            : "\"" + search.Trim().Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
 }

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 
 using AspNetDesignPatterns.Api.Features.Library;
 
@@ -93,6 +94,35 @@ public class LibraryEndpointTests
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         problem!.Errors.Should().ContainKey("Cursor");
+    }
+
+    [TestCase("BookId")]
+    [TestCase("LoanId")]
+    public async Task The_openapi_document_describes_a_typed_id_as_the_plain_integer_on_the_wire(string schemaName)
+    {
+        // Arrange & Act
+        JsonElement document = await Factory.CreateClient().GetFromJsonAsync<JsonElement>("/openapi/v1.json");
+        JsonElement schema = document.GetProperty("components").GetProperty("schemas").GetProperty(schemaName);
+
+        // Assert — not the struct's shape (an object with a "value" property)
+        schema.GetProperty("type").GetString().Should().Be("integer");
+        schema.GetProperty("format").GetString().Should().Be("int32");
+        schema.TryGetProperty("properties", out _).Should().BeFalse();
+    }
+
+    [Test]
+    public async Task A_search_too_short_for_the_index_is_a_400_validation_problem()
+    {
+        // Arrange
+        HttpClient client = await NewMemberAsync();
+
+        // Act
+        HttpResponseMessage response = await client.GetAsync($"{BOOKS}?search=em");
+        ValidationProblemDetails? problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        problem!.Errors.Should().ContainKey("Search");
     }
 
     [Test]

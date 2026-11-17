@@ -107,16 +107,70 @@ public class ListBooksHandlerTests
     }
 
     [Test]
-    public async Task Search_treats_like_wildcards_as_literal_text()
+    public async Task Search_matches_inside_a_word()
+    {
+        // Arrange
+        _database.AddBook("Dracula", "Bram Stoker");
+        _database.AddBook("Emma", "Jane Austen");
+
+        // Act
+        List<string> titles = await ReadAllPagesAsync(limit: 10, search: "acu");
+
+        // Assert
+        titles.Should().Equal("Dracula|Bram Stoker");
+    }
+
+    [Test]
+    public async Task Search_ignores_accents()
+    {
+        // Arrange
+        _database.AddBook("Wuthering Heights", "Emily Brontë");
+
+        // Act
+        List<string> titles = await ReadAllPagesAsync(limit: 10, search: "bronte");
+
+        // Assert
+        titles.Should().Equal("Wuthering Heights|Emily Brontë");
+    }
+
+    [Test]
+    public async Task Search_treats_its_input_as_literal_text_not_query_syntax()
     {
         // Arrange
         _database.AddBook("100% Pure");
         _database.AddBook("1000 Years");
+        _database.AddBook("Say \"Hello\"");
+        _database.AddBook("Emma");
+        _database.AddBook("Hard Times");
 
         // Act
-        List<string> titles = await ReadAllPagesAsync(limit: 10, search: "100%");
+        List<string> percent = await ReadAllPagesAsync(limit: 10, search: "100%");
+        List<string> quoted = await ReadAllPagesAsync(limit: 10, search: "\"Hello\"");
+        List<string> or = await ReadAllPagesAsync(limit: 10, search: "emma OR times");
+
+        // Assert — "OR" is three letters of text here, not FTS5's OR operator
+        percent.Should().Equal("100% Pure|An Author");
+        quoted.Should().Equal("Say \"Hello\"|An Author");
+        or.Should().BeEmpty();
+    }
+
+    [Test]
+    public async Task Search_follows_renamed_and_deleted_books()
+    {
+        // Arrange — the index is kept in sync by triggers (003_books_search.sql)
+        BookId bookId = _database.AddBook("Dracula");
+        _database.AddBook("Emma");
+
+        // Act
+        _database.Execute($"UPDATE books SET title = 'Carmilla' WHERE id = {bookId};");
+        List<string> oldTitle = await ReadAllPagesAsync(limit: 10, search: "Dracula");
+        List<string> newTitle = await ReadAllPagesAsync(limit: 10, search: "milla");
+        _database.Execute($"DELETE FROM books WHERE id = {bookId};");
+        List<string> deleted = await ReadAllPagesAsync(limit: 10, search: "milla");
 
         // Assert
-        titles.Should().Equal("100% Pure|An Author");
+        oldTitle.Should().BeEmpty();
+        newTitle.Should().Equal("Carmilla|An Author");
+        deleted.Should().BeEmpty();
     }
 }

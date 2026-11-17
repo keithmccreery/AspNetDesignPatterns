@@ -85,7 +85,7 @@ internal sealed class LibraryTestDatabase : IDbConnectionFactory, IDisposable
         return await call(scope.ServiceProvider.GetRequiredService<ILibraryService>());
     }
 
-    public int AddBook(string title, string author = "An Author", int copies = 1)
+    public BookId AddBook(string title, string author = "An Author", int copies = 1)
     {
         using SqliteCommand command = _keepAlive.CreateCommand();
         command.CommandText = """
@@ -95,10 +95,10 @@ internal sealed class LibraryTestDatabase : IDbConnectionFactory, IDisposable
         command.Parameters.AddWithValue("$title", title);
         command.Parameters.AddWithValue("$author", author);
         command.Parameters.AddWithValue("$copies", copies);
-        return Convert.ToInt32(command.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
+        return new BookId(Convert.ToInt32(command.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture));
     }
 
-    public int AvailableCopies(int bookId) =>
+    public int AvailableCopies(BookId bookId) =>
         Scalar($"SELECT available_copies FROM books WHERE id = {bookId};");
 
     public int LoanCount() => Scalar("SELECT COUNT(*) FROM loans;");

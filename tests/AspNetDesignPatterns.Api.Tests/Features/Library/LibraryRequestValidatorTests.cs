@@ -56,6 +56,29 @@ public class LibraryRequestValidatorTests
         result.Errors.Should().ContainSingle().Which.PropertyName.Should().Be("Search");
     }
 
+    [TestCase("ab")]
+    [TestCase("  ab  ")]
+    public void ListBooks_rejects_a_search_shorter_than_the_index_can_match(string search)
+    {
+        // Act
+        ValidationResult result = new ListBooksRequestValidator(Options).Validate(new ListBooksRequest(search, null, null));
+
+        // Assert
+        result.Errors.Should().ContainSingle().Which.PropertyName.Should().Be("Search");
+    }
+
+    [TestCase(null)]
+    [TestCase("   ")]
+    [TestCase("abc")]
+    public void ListBooks_accepts_no_search_or_one_of_three_characters(string? search)
+    {
+        // Act
+        ValidationResult result = new ListBooksRequestValidator(Options).Validate(new ListBooksRequest(search, null, null));
+
+        // Assert
+        result.IsValid.Should().BeTrue();
+    }
+
     [Test]
     public void ListLoans_accepts_its_own_cursor()
     {

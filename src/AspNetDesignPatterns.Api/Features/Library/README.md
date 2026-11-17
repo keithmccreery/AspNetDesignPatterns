@@ -27,6 +27,9 @@ carry both (`Jwt:DevTokenScopes`).
 | `*Endpoint.cs` (6) | `IEndpoint`s — bind (`[AsParameters]`), validate the list requests, delegate to the handler, `ToHttpResultAsync()`. `BorrowBookEndpoint` returns `201 Created` via `TypedResults.CreatedAtRoute` to `GetLoanEndpoint`. |
 | `ListBooksRequest.cs`, `ListLoansRequest.cs` | Paged requests (`ICursorPagedRequest`), their cursor keys (`BookCursor`, `LoanCursor`) and validators (`Include` the shared paging rules). |
 | `LibraryRequests.cs` | The single-resource requests. No validators: an id that matches nothing is already a 404. |
+| `LibraryIds.cs` | `BookId` and `LoanId`, the strongly typed ids. See [Strongly typed ids](#strongly-typed-ids). |
+| `IdTypeHandler.cs` | The Dapper handler that reads and writes a typed id as its `INTEGER` column. |
+| `IdOpenApiSchemaTransformer.cs` | Documents the typed ids as plain integers in the OpenAPI document. |
 | `MemberId.cs` | The caller, from the token's `sub` claim — bound into request records by `BindAsync`, so handlers never see a `ClaimsPrincipal`. |
 | `*Handler.cs` (6) | The use cases, as seen by the API: call `ILibraryService`, map rows to responses, and (for the lists) own the paging contract — decode the cursor, ask for `limit + 1`, build the next cursor. No exception handling, no SQL, no transactions. |
 | `ILibraryService.cs`, `LibraryService.cs` | The service layer, the counterpart of `IWeatherService`: business rules, the order of repository calls, the transaction boundary (`ExecuteInTransactionAsync`), and `DbException` → `LibraryErrors.DatabaseUnavailable` via `Result.TryAsync`. Returns `Result<BookRow/LoanRow>`. |
@@ -41,6 +44,7 @@ carry both (`Jwt:DevTokenScopes`).
 | `DateTimeOffsetTypeHandler.cs` | Dapper ↔ ISO-8601 UTC text, since SQLite has no date type. |
 | `LibraryDatabaseInitializer.cs` | `IHostedService` that runs `SqlScriptMigrator` on `Schema/*.sql` before the server starts listening. |
 | `Schema/001_create_tables.sql`, `002_seed_books.sql` | The schema, and 50 public-domain books to page through. |
+| `Schema/003_books_search.sql` | The `books_search` full-text index (FTS5, trigram tokenizer) and the triggers that keep it in sync. See [Search](#search). |
 | `LibraryDatabaseHealthCheck.cs` | `SELECT 1`, tagged `ready`; `Unhealthy` on failure (the app's own database, unlike Weather's `Degraded` upstream). |
 
 ## Request flow: borrowing a book
@@ -94,9 +98,41 @@ data never collide at a page boundary. See
 [`KAM.Common/Pagination/README.md`](../../../KAM.Common/Pagination/README.md) for the cursor
 format, its validation, and cursor vs offset.
 
-Search is `LIKE '%…%'` on title or author, case-insensitive for ASCII, with `%`, `_` and `\`
-in the input escaped so they match literally. It can't use an index; for a large catalogue,
-SQLite's FTS5 (or the database's full-text search) is the next step.
+## Search
+
+`?search=` matches **anywhere in the title or author** ("acu" finds *Dracula*), ignoring case
+and accents ("bronte" finds *Brontë*). It runs against `books_search`, an
+[FTS5](https://sqlite.org/fts5.html) full-text index created by `Schema/003_books_search.sql`
+with the **trigram tokenizer**: the index records every 3-character slice of the text, which is
+what lets it match inside a word. (FTS5's default tokenizer indexes whole words, so it can only
+match a word or, with `*`, the start of one.)
+
+How it fits together:
+
+- **A filter, not an order.** The query finds matching ids in `books_search` and keeps the
+  usual `ORDER BY title, id`, so search results page with the same `(title, id)` cursor as the
+  full list.
+- **Literal input.** FTS5 has its own query language (`AND`, `OR`, `NOT`, `NEAR`, `*`, column
+  filters). The repository wraps the whole search in double quotes, doubling any inside it, so
+  it's always one literal phrase: `emma OR times` looks for that exact text, and `pride and`
+  for those words in that order.
+- **No second copy of the text.** `content='books'` makes it an *external-content* index: it
+  stores only the index and reads titles and authors from `books`. The cost is keeping it in
+  sync, which three triggers do on insert, delete, and an update **of `title` or `author`**
+  (not of `available_copies`, which every borrow and return changes).
+- **Existing databases** get the index the next time the app starts: the migrator applies
+  `003`, which builds it from the books already there.
+
+Requirements and limitations:
+
+| | |
+|---|---|
+| **Minimum length** | A search must be at least **3 characters** after trimming. Shorter ones can't match any 3-character slice, so the validator returns a 400 rather than an empty page that looks like "no such book". |
+| **Index size** | About **3.6× the size of the indexed text**, which made the whole database about **2.5× larger** (measured on synthetic catalogues of 10,000 and 100,000 books; the 50-book seed adds 32 KB). |
+| **Speed** | A search that matches only a few books is where the index pays: one match in 100,000 books took **0.02 ms** against **21 ms** for the `LIKE` scan it replaced. A search matching thousands is about the same either way (and can be slightly slower), because the index collects every match before sorting, where `LIKE` walking the title index stops after one page. |
+| **No relevance ranking** | Results stay in title order. FTS5's `bm25()` could rank them, but its scores shift as books are added or removed, so a page boundary could move between requests; a ranked list would need a `(score, id)` cursor and that caveat documented. |
+| **No stemming or sound-alikes** | `run` doesn't find *ran*, and `drakula` doesn't find *Dracula*. The trigram tokenizer has no stemmer, and this SQLite build has neither `soundex()` nor the `spellfix1` extension. Sound-alike search would mean storing a phonetic key (e.g. Double Metaphone) computed in C#, or a database with it built in (PostgreSQL's `fuzzystrmatch` / `pg_trgm`). |
+| **Requires** | SQLite 3.34+ for the trigram tokenizer and 3.45+ for its `remove_diacritics` option. The bundled Microsoft.Data.Sqlite build is 3.53. |
 
 ## SQLite notes
 
@@ -113,7 +149,7 @@ SQLite's FTS5 (or the database's full-text search) is the next step.
 - **The file** is `library.db` in the content root (git-ignored), created and seeded on first
   run. Delete it to start over.
 - **Moving to PostgreSQL** means a new `IDbConnectionFactory` (Npgsql) and the SQL dialect
-  (`ILIKE`, identity columns, `timestamptz` instead of the type handler); `IUnitOfWork`,
+  (identity columns, `timestamptz` instead of the type handler, `pg_trgm` in place of the FTS5 index); `IUnitOfWork`,
   `SqlScriptMigrator`, the service, the handlers and the paging code don't change. A hosted
   database's connection string is a secret: it would come from `.env`, like `Jwt__SigningKey`.
 
@@ -148,6 +184,43 @@ because the conditional `UPDATE`, the rollback and the unique index are the beha
 test and a substitute would fake them away. `LibraryHandlerTests` substitute `ILibraryService`,
 because mapping and cursor handling don't need a database.
 
+## Strongly typed ids
+
+A book id and a loan id are both integers, so with plain `int`s nothing stops one being passed
+where the other belongs:
+
+```csharp
+await library.ReturnLoanAsync(book.Id, member, ct);   // with ints: compiles, and returns the wrong loan or a 404
+```
+
+`BookId` and `LoanId` (`LibraryIds.cs`) make that a compile error. They're `readonly record
+struct`s wrapping the `int`: no allocation, value equality, nothing to null-check. Where they
+apply is the point:
+
+| | What it sees | Why |
+|---|---|---|
+| **The wire** (URLs, JSON, cursors, OpenAPI) | Plain integers: `/books/7`, `"id": 7`, `"bookId": 7` | Clients don't know or care about the types, so the API contract is unchanged. Response DTOs and cursors keep `int` properties: they *are* the wire. `IdOpenApiSchemaTransformer` documents the types as `integer`/`int32`, not as the struct. |
+| **The edge** (binding the request) | `string` → `BookId`, once | The route value binds straight into the request record (`GetBookRequest(BookId BookId)`) through the type's `TryParse`, so there's never a bare `int` to mix up. A rule every id must meet could live in `TryParse` too, applied to every endpoint at once. Here it accepts any integer, as the `{bookId:int}` route constraint did: an id that matches nothing is still a 404. |
+| **Inside** (handler → service → repository → rows) | `BookId`, `LoanId` everywhere | The id passes through four layers, and each one is a chance to pass the wrong `int`. Tests often wouldn't catch it, because in a small test database book 1 and loan 1 both exist. |
+| **The database** | `INTEGER` columns | Another wire. `IdTypeHandler<TId>` lets Dapper read a column into a typed id and send one as a parameter, so the repository never unwraps an id by hand. |
+
+Two details:
+- **`ToString()` prints the bare number**, so a log line or an interpolated route says `7`,
+  not `BookId { Value = 7 }`. Error context (`WithContext`) passes `.Value`, because Serilog
+  would otherwise log the struct's shape.
+- **No implicit conversions.** `int` → `BookId` would let a bare number through, undoing the
+  whole point. `BookId` → `int` keeps a `LoanId` out of a `BookId` parameter (C# won't chain
+  two user-defined conversions), but lets the ids meet as numbers everywhere else:
+  `loan.Id == book.Id` compiles and is true when the numbers match, `book.Id + 1` compiles, and
+  a `LoanId` fits any `int` parameter. The explicit `.Value` appears only where a value leaves
+  the typed world (response DTOs, cursors, log context), which makes those places easy to see.
+- **`MemberId`** is the same idea for the caller, and arrived first: a `string` from the
+  token's `sub` claim, bound by `BindAsync` instead of `TryParse`.
+
+The cost is the code at each boundary: `TryParse`, the Dapper handler and the OpenAPI
+transformer, written once, plus `.Value` where a DTO is built. The benefit grows with the
+number of id types that look alike, which in a real system (often all `Guid`s) is most of them.
+
 ## Tests
 
 `tests/AspNetDesignPatterns.Api.Tests/Features/Library/` — the database tests use a real
@@ -165,16 +238,20 @@ in its own DI scope, like a request):
   handed to the service.
 - `ListBooksHandlerTests` — paging and search end to end: first page + cursor; following
   cursors visits every book once (equal titles across a page boundary); an insert behind the
-  cursor doesn't shift the next page; search on title or author, case-insensitive, with `%`
-  taken literally.
+  cursor doesn't shift the next page; search on title or author, case-insensitive, inside a
+  word, ignoring accents, with FTS5 syntax taken literally; the index follows a renamed and a
+  deleted book.
 - `ListLoansHandlerTests` — the caller's loans paged newest first, end to end.
 - `LibraryRequestValidatorTests` — configured max page size, a loan cursor rejected by the
-  book list, search length.
+  book list, search length (at most 100, at least 3 after trimming).
+- `LibraryIdsTests` — `BookId`/`LoanId` parse a route value, reject a non-integer, and print
+  as the bare number.
 - `LibraryInfrastructureTests` — `MemberId` binding with and without `sub`, data-source path
   resolution, health check healthy/unhealthy.
 
 `tests/…/Integration/LibraryEndpointTests` — through the real host and the database it
 migrated and seeded at startup: 401 without a token; paging the whole catalogue with
 `nextCursor` (50 books, 8 pages, no repeats); explicit `"nextCursor": null`; 400 on a tampered
-cursor; borrow → 201 + `Location` → GET it → return; 409 `ProblemDetails` with `errorCode`;
+cursor and on a search under 3 characters; the OpenAPI document describing `BookId`/`LoanId`
+as plain integers; borrow → 201 + `Location` → GET it → return; 409 `ProblemDetails` with `errorCode`;
 loans private to their member.
