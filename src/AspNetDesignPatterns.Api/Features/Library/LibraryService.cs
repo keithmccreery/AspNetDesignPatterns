@@ -46,19 +46,19 @@ internal sealed class LibraryService : ILibraryService
             async () => Result.Success(await _repository.ListBooksAsync(search, after, take, cancellationToken)),
             new { Search = search, Take = take });
 
-    public Task<Result<BookRow>> GetBookAsync(int bookId, CancellationToken cancellationToken) =>
+    public Task<Result<BookRow>> GetBookAsync(BookId bookId, CancellationToken cancellationToken) =>
         GuardAsync<BookRow>(
             async () => await _repository.GetBookAsync(bookId, cancellationToken) is { } book
                 ? book
                 : LibraryErrors.BookNotFound,
-            new { BookId = bookId });
+            new { BookId = bookId.Value });
 
     /// <remarks>
     /// The slice's unit-of-work example: a failure partway through (the member already has the
     /// book) returns an error, and the transaction rolls back the copy already taken, with no
     /// compensating code.
     /// </remarks>
-    public Task<Result<LoanRow>> BorrowBookAsync(int bookId, MemberId member, CancellationToken cancellationToken) =>
+    public Task<Result<LoanRow>> BorrowBookAsync(BookId bookId, MemberId member, CancellationToken cancellationToken) =>
         GuardAsync(
             () => _unitOfWork.ExecuteInTransactionAsync<LoanRow>(
                 async transactionToken =>
@@ -82,14 +82,14 @@ internal sealed class LibraryService : ILibraryService
                     return await _repository.InsertLoanAsync(bookId, member, now, now + _options.LoanPeriod, transactionToken);
                 },
                 cancellationToken),
-            new { BookId = bookId });
+            new { BookId = bookId.Value });
 
-    public Task<Result<LoanRow>> GetLoanAsync(int loanId, MemberId member, CancellationToken cancellationToken) =>
+    public Task<Result<LoanRow>> GetLoanAsync(LoanId loanId, MemberId member, CancellationToken cancellationToken) =>
         GuardAsync<LoanRow>(
             async () => await _repository.GetLoanAsync(loanId, member, cancellationToken) is { } loan
                 ? loan
                 : LibraryErrors.LoanNotFound,
-            new { LoanId = loanId });
+            new { LoanId = loanId.Value });
 
     public Task<Result<IReadOnlyList<LoanRow>>> ListLoansAsync(
         MemberId member,
@@ -100,7 +100,7 @@ internal sealed class LibraryService : ILibraryService
             async () => Result.Success(await _repository.ListLoansAsync(member, after, take, cancellationToken)),
             new { Take = take });
 
-    public Task<Result<LoanRow>> ReturnLoanAsync(int loanId, MemberId member, CancellationToken cancellationToken) =>
+    public Task<Result<LoanRow>> ReturnLoanAsync(LoanId loanId, MemberId member, CancellationToken cancellationToken) =>
         GuardAsync(
             () => _unitOfWork.ExecuteInTransactionAsync<LoanRow>(
                 async transactionToken =>
@@ -122,7 +122,7 @@ internal sealed class LibraryService : ILibraryService
                     return closed;
                 },
                 cancellationToken),
-            new { LoanId = loanId });
+            new { LoanId = loanId.Value });
 
     // The one place this service turns an exception into a Result. The context is attached for
     // the log; the exception message never reaches the client (ProblemDetails shows the Error's).
@@ -131,7 +131,7 @@ internal sealed class LibraryService : ILibraryService
 
     // Nothing was written yet, so there's nothing to roll back -- only the right 4xx to pick.
     // "You already have it" beats "none left" when the member holds the last copy themselves.
-    private async Task<Error> WhyNoCopyAsync(int bookId, MemberId member, CancellationToken cancellationToken)
+    private async Task<Error> WhyNoCopyAsync(BookId bookId, MemberId member, CancellationToken cancellationToken)
     {
         if (await _repository.GetBookAsync(bookId, cancellationToken) is null)
         {

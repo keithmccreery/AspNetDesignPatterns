@@ -31,38 +31,38 @@ internal interface ILibraryRepository
     Task<IReadOnlyList<BookRow>> ListBooksAsync(string? search, BookCursor? after, int take, CancellationToken cancellationToken);
 
     /// <summary>The book, or <see langword="null"/> if no book has that id.</summary>
-    Task<BookRow?> GetBookAsync(int bookId, CancellationToken cancellationToken);
+    Task<BookRow?> GetBookAsync(BookId bookId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Takes one copy off the shelf if there is one. A conditional UPDATE, not read-then-write:
     /// the check and the decrement are one statement, so two borrowers can't both take the last copy.
     /// </summary>
     /// <returns><see langword="false"/> when the book doesn't exist or has no copy available.</returns>
-    Task<bool> TryTakeCopyAsync(int bookId, CancellationToken cancellationToken);
+    Task<bool> TryTakeCopyAsync(BookId bookId, CancellationToken cancellationToken);
 
     /// <summary>Whether the member has a loan of this book that hasn't been returned.</summary>
-    Task<bool> HasOpenLoanAsync(int bookId, MemberId member, CancellationToken cancellationToken);
+    Task<bool> HasOpenLoanAsync(BookId bookId, MemberId member, CancellationToken cancellationToken);
 
     /// <summary>Records a new loan and returns it.</summary>
-    Task<LoanRow> InsertLoanAsync(int bookId, MemberId member, DateTimeOffset borrowedAt, DateTimeOffset dueAt, CancellationToken cancellationToken);
+    Task<LoanRow> InsertLoanAsync(BookId bookId, MemberId member, DateTimeOffset borrowedAt, DateTimeOffset dueAt, CancellationToken cancellationToken);
 
     /// <summary>The member's loan, or <see langword="null"/> if it doesn't exist or belongs to someone else.</summary>
-    Task<LoanRow?> GetLoanAsync(int loanId, MemberId member, CancellationToken cancellationToken);
+    Task<LoanRow?> GetLoanAsync(LoanId loanId, MemberId member, CancellationToken cancellationToken);
 
     /// <summary>One keyset page of the member's loans, newest first. Pass <c>take = limit + 1</c>.</summary>
     Task<IReadOnlyList<LoanRow>> ListLoansAsync(MemberId member, LoanCursor? after, int take, CancellationToken cancellationToken);
 
     /// <summary>Marks the loan returned and returns it. Doesn't touch the book: see <see cref="ReturnCopyAsync"/>.</summary>
-    Task<LoanRow> CloseLoanAsync(int loanId, DateTimeOffset returnedAt, CancellationToken cancellationToken);
+    Task<LoanRow> CloseLoanAsync(LoanId loanId, DateTimeOffset returnedAt, CancellationToken cancellationToken);
 
     /// <summary>Puts one copy of the book back on the shelf; the counterpart of <see cref="TryTakeCopyAsync"/>.</summary>
-    Task ReturnCopyAsync(int bookId, CancellationToken cancellationToken);
+    Task ReturnCopyAsync(BookId bookId, CancellationToken cancellationToken);
 }
 
 /// <summary>A <c>books</c> row.</summary>
 internal sealed class BookRow
 {
-    public int Id { get; init; }
+    public BookId Id { get; init; }
 
     public string Title { get; init; } = string.Empty;
 
@@ -78,9 +78,9 @@ internal sealed class BookRow
 /// <summary>A <c>loans</c> row joined to its book's title.</summary>
 internal sealed class LoanRow
 {
-    public int Id { get; init; }
+    public LoanId Id { get; init; }
 
-    public int BookId { get; init; }
+    public BookId BookId { get; init; }
 
     public string BookTitle { get; init; } = string.Empty;
 

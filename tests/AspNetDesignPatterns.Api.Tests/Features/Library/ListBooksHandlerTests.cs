@@ -158,7 +158,7 @@ public class ListBooksHandlerTests
     public async Task Search_follows_renamed_and_deleted_books()
     {
         // Arrange — the index is kept in sync by triggers (003_books_search.sql)
-        int bookId = _database.AddBook("Dracula");
+        BookId bookId = _database.AddBook("Dracula");
         _database.AddBook("Emma");
 
         // Act

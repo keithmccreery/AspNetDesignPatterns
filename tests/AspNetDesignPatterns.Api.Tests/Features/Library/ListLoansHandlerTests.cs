@@ -20,8 +20,9 @@ public class ListLoansHandlerTests
     [TearDown]
     public void TearDown() => _database.Dispose();
 
-    private async Task<int> BorrowAsync(int bookId, MemberId member) =>
-        (await _database.CallAsync(library => library.BorrowBookAsync(bookId, member, CancellationToken.None))).Value.Id;
+    // The response's id is the plain number clients see, so the test compares numbers.
+    private async Task<int> BorrowAsync(BookId bookId, MemberId member) =>
+        (await _database.CallAsync(library => library.BorrowBookAsync(bookId, member, CancellationToken.None))).Value.Id.Value;
 
     private async Task<CursorPage<LoanResponse>> ListAsync(MemberId member, string? cursor) =>
         (await _database.SendAsync<ListLoansRequest, CursorPage<LoanResponse>>(new ListLoansRequest(member, Limit: 2, cursor))).Value;

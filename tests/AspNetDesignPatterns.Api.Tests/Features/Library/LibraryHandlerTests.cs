@@ -25,16 +25,16 @@ public class LibraryHandlerTests
     private readonly ILibraryService _library = Substitute.For<ILibraryService>();
 
     private static BookRow Book(int id, string title) =>
-        new() { Id = id, Title = title, Author = "An Author", PublishedYear = 1900, TotalCopies = 1, AvailableCopies = 1 };
+        new() { Id = new BookId(id), Title = title, Author = "An Author", PublishedYear = 1900, TotalCopies = 1, AvailableCopies = 1 };
 
     [Test]
     public async Task GetBook_maps_the_row_to_the_response()
     {
         // Arrange
-        _library.GetBookAsync(7, Arg.Any<CancellationToken>()).Returns(Result.Success(Book(7, "Emma")));
+        _library.GetBookAsync(new BookId(7), Arg.Any<CancellationToken>()).Returns(Result.Success(Book(7, "Emma")));
 
         // Act
-        Result<BookResponse> result = await new GetBookHandler(_library).HandleAsync(new GetBookRequest(7), CancellationToken.None);
+        Result<BookResponse> result = await new GetBookHandler(_library).HandleAsync(new GetBookRequest(new BookId(7)), CancellationToken.None);
 
         // Assert
         result.Value.Should().BeEquivalentTo(new { Id = 7, Title = "Emma", AvailableCopies = 1 });
@@ -44,12 +44,12 @@ public class LibraryHandlerTests
     public async Task Borrow_passes_the_member_through_and_a_failure_back_unchanged()
     {
         // Arrange
-        _library.BorrowBookAsync(7, Alice, Arg.Any<CancellationToken>())
+        _library.BorrowBookAsync(new BookId(7), Alice, Arg.Any<CancellationToken>())
             .Returns(Result.Failure<LoanRow>(LibraryErrors.NoCopiesAvailable));
 
         // Act
         Result<LoanResponse> result = await new BorrowBookHandler(_library)
-            .HandleAsync(new BorrowBookRequest(7, Alice), CancellationToken.None);
+            .HandleAsync(new BorrowBookRequest(new BookId(7), Alice), CancellationToken.None);
 
         // Assert
         result.Error.Should().Be(LibraryErrors.NoCopiesAvailable);

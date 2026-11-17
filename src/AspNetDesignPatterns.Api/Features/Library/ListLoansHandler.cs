@@ -26,7 +26,7 @@ internal sealed class ListLoansHandler : IRequestHandler<ListLoansRequest, Curso
 
         return _library.ListLoansAsync(request.Member, after, limit + 1, cancellationToken)
             .MapAsync(rows => CursorPage
-                .From(rows, limit, row => new LoanCursor(row.Id))
+                .From(rows, limit, row => new LoanCursor(row.Id.Value))
                 .Map(LoanResponse.From));
     }
 }

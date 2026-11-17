@@ -27,6 +27,9 @@ carry both (`Jwt:DevTokenScopes`).
 | `*Endpoint.cs` (6) | `IEndpoint`s — bind (`[AsParameters]`), validate the list requests, delegate to the handler, `ToHttpResultAsync()`. `BorrowBookEndpoint` returns `201 Created` via `TypedResults.CreatedAtRoute` to `GetLoanEndpoint`. |
 | `ListBooksRequest.cs`, `ListLoansRequest.cs` | Paged requests (`ICursorPagedRequest`), their cursor keys (`BookCursor`, `LoanCursor`) and validators (`Include` the shared paging rules). |
 | `LibraryRequests.cs` | The single-resource requests. No validators: an id that matches nothing is already a 404. |
+| `LibraryIds.cs` | `BookId` and `LoanId`, the strongly typed ids. See [Strongly typed ids](#strongly-typed-ids). |
+| `IdTypeHandler.cs` | The Dapper handler that reads and writes a typed id as its `INTEGER` column. |
+| `IdOpenApiSchemaTransformer.cs` | Documents the typed ids as plain integers in the OpenAPI document. |
 | `MemberId.cs` | The caller, from the token's `sub` claim — bound into request records by `BindAsync`, so handlers never see a `ClaimsPrincipal`. |
 | `*Handler.cs` (6) | The use cases, as seen by the API: call `ILibraryService`, map rows to responses, and (for the lists) own the paging contract — decode the cursor, ask for `limit + 1`, build the next cursor. No exception handling, no SQL, no transactions. |
 | `ILibraryService.cs`, `LibraryService.cs` | The service layer, the counterpart of `IWeatherService`: business rules, the order of repository calls, the transaction boundary (`ExecuteInTransactionAsync`), and `DbException` → `LibraryErrors.DatabaseUnavailable` via `Result.TryAsync`. Returns `Result<BookRow/LoanRow>`. |
@@ -181,6 +184,37 @@ because the conditional `UPDATE`, the rollback and the unique index are the beha
 test and a substitute would fake them away. `LibraryHandlerTests` substitute `ILibraryService`,
 because mapping and cursor handling don't need a database.
 
+## Strongly typed ids
+
+A book id and a loan id are both integers, so with plain `int`s nothing stops one being passed
+where the other belongs:
+
+```csharp
+await library.ReturnLoanAsync(book.Id, member, ct);   // with ints: compiles, and returns the wrong loan or a 404
+```
+
+`BookId` and `LoanId` (`LibraryIds.cs`) make that a compile error. They're `readonly record
+struct`s wrapping the `int`: no allocation, value equality, nothing to null-check. Where they
+apply is the point:
+
+| | What it sees | Why |
+|---|---|---|
+| **The wire** (URLs, JSON, cursors, OpenAPI) | Plain integers: `/books/7`, `"id": 7`, `"bookId": 7` | Clients don't know or care about the types, so the API contract is unchanged. Response DTOs and cursors keep `int` properties: they *are* the wire. `IdOpenApiSchemaTransformer` documents the types as `integer`/`int32`, not as the struct. |
+| **The edge** (binding the request) | `string` → `BookId`, once | The route value binds straight into the request record (`GetBookRequest(BookId BookId)`) through the type's `TryParse`, so there's never a bare `int` to mix up. A rule every id must meet could live in `TryParse` too, applied to every endpoint at once. Here it accepts any integer, as the `{bookId:int}` route constraint did: an id that matches nothing is still a 404. |
+| **Inside** (handler → service → repository → rows) | `BookId`, `LoanId` everywhere | The id passes through four layers, and each one is a chance to pass the wrong `int`. Tests often wouldn't catch it, because in a small test database book 1 and loan 1 both exist. |
+| **The database** | `INTEGER` columns | Another wire. `IdTypeHandler<TId>` lets Dapper read a column into a typed id and send one as a parameter, so the repository never unwraps an id by hand. |
+
+Two details:
+- **`ToString()` prints the bare number**, so a log line or an interpolated route says `7`,
+  not `BookId { Value = 7 }`. Error context (`WithContext`) passes `.Value`, because Serilog
+  would otherwise log the struct's shape.
+- **`MemberId`** is the same idea for the caller, and arrived first: a `string` from the
+  token's `sub` claim, bound by `BindAsync` instead of `TryParse`.
+
+The cost is the code at each boundary: `TryParse`, the Dapper handler and the OpenAPI
+transformer, written once, plus `.Value` where a DTO is built. The benefit grows with the
+number of id types that look alike, which in a real system (often all `Guid`s) is most of them.
+
 ## Tests
 
 `tests/AspNetDesignPatterns.Api.Tests/Features/Library/` — the database tests use a real
@@ -204,6 +238,8 @@ in its own DI scope, like a request):
 - `ListLoansHandlerTests` — the caller's loans paged newest first, end to end.
 - `LibraryRequestValidatorTests` — configured max page size, a loan cursor rejected by the
   book list, search length (at most 100, at least 3 after trimming).
+- `LibraryIdsTests` — `BookId`/`LoanId` parse a route value, reject a non-integer, and print
+  as the bare number.
 - `LibraryInfrastructureTests` — `MemberId` binding with and without `sub`, data-source path
   resolution, health check healthy/unhealthy.
 

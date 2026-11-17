@@ -52,7 +52,7 @@ internal sealed class LibraryRepository : ILibraryRepository
     }
 
     /// <inheritdoc />
-    public async Task<BookRow?> GetBookAsync(int bookId, CancellationToken cancellationToken)
+    public async Task<BookRow?> GetBookAsync(BookId bookId, CancellationToken cancellationToken)
     {
         const string SQL = $"SELECT {BOOK_COLUMNS} FROM books WHERE id = @BookId;";
         DbConnection connection = await _unitOfWork.GetConnectionAsync(cancellationToken);
@@ -60,7 +60,7 @@ internal sealed class LibraryRepository : ILibraryRepository
     }
 
     /// <inheritdoc />
-    public async Task<bool> TryTakeCopyAsync(int bookId, CancellationToken cancellationToken)
+    public async Task<bool> TryTakeCopyAsync(BookId bookId, CancellationToken cancellationToken)
     {
         const string SQL = """
             UPDATE books SET available_copies = available_copies - 1
@@ -70,7 +70,7 @@ internal sealed class LibraryRepository : ILibraryRepository
     }
 
     /// <inheritdoc />
-    public async Task<bool> HasOpenLoanAsync(int bookId, MemberId member, CancellationToken cancellationToken)
+    public async Task<bool> HasOpenLoanAsync(BookId bookId, MemberId member, CancellationToken cancellationToken)
     {
         const string SQL = """
             SELECT EXISTS (
@@ -84,7 +84,7 @@ internal sealed class LibraryRepository : ILibraryRepository
 
     /// <inheritdoc />
     public async Task<LoanRow> InsertLoanAsync(
-        int bookId,
+        BookId bookId,
         MemberId member,
         DateTimeOffset borrowedAt,
         DateTimeOffset dueAt,
@@ -96,7 +96,7 @@ internal sealed class LibraryRepository : ILibraryRepository
             RETURNING id;
             """;
         DbConnection connection = await _unitOfWork.GetConnectionAsync(cancellationToken);
-        int loanId = await connection.ExecuteScalarAsync<int>(Command(
+        LoanId loanId = await connection.ExecuteScalarAsync<LoanId>(Command(
             SQL,
             new { BookId = bookId, MemberId = member.Value, BorrowedAt = borrowedAt, DueAt = dueAt },
             cancellationToken));
@@ -105,7 +105,7 @@ internal sealed class LibraryRepository : ILibraryRepository
     }
 
     /// <inheritdoc />
-    public async Task<LoanRow?> GetLoanAsync(int loanId, MemberId member, CancellationToken cancellationToken)
+    public async Task<LoanRow?> GetLoanAsync(LoanId loanId, MemberId member, CancellationToken cancellationToken)
     {
         const string SQL = $"{LOAN_SELECT} WHERE l.id = @LoanId AND l.member_id = @MemberId;";
         DbConnection connection = await _unitOfWork.GetConnectionAsync(cancellationToken);
@@ -136,7 +136,7 @@ internal sealed class LibraryRepository : ILibraryRepository
     }
 
     /// <inheritdoc />
-    public async Task<LoanRow> CloseLoanAsync(int loanId, DateTimeOffset returnedAt, CancellationToken cancellationToken)
+    public async Task<LoanRow> CloseLoanAsync(LoanId loanId, DateTimeOffset returnedAt, CancellationToken cancellationToken)
     {
         await ExecuteAsync(
             "UPDATE loans SET returned_at = @ReturnedAt WHERE id = @LoanId AND returned_at IS NULL;",
@@ -147,7 +147,7 @@ internal sealed class LibraryRepository : ILibraryRepository
     }
 
     /// <inheritdoc />
-    public Task ReturnCopyAsync(int bookId, CancellationToken cancellationToken) =>
+    public Task ReturnCopyAsync(BookId bookId, CancellationToken cancellationToken) =>
         ExecuteAsync(
             "UPDATE books SET available_copies = available_copies + 1 WHERE id = @BookId;",
             new { BookId = bookId },
@@ -155,7 +155,7 @@ internal sealed class LibraryRepository : ILibraryRepository
 
     // A loan this repository has just written: QuerySingle, so a missing row (which would be a
     // bug) throws here, in the layer allowed to throw, instead of reaching the service as null.
-    private async Task<LoanRow> GetRequiredLoanAsync(int loanId, CancellationToken cancellationToken)
+    private async Task<LoanRow> GetRequiredLoanAsync(LoanId loanId, CancellationToken cancellationToken)
     {
         DbConnection connection = await _unitOfWork.GetConnectionAsync(cancellationToken);
         return await connection.QuerySingleAsync<LoanRow>(

@@ -31,7 +31,7 @@ internal sealed class ListBooksHandler : IRequestHandler<ListBooksRequest, Curso
 
         return _library.ListBooksAsync(request.Search, after, limit + 1, cancellationToken)
             .MapAsync(rows => CursorPage
-                .From(rows, limit, row => new BookCursor(row.Title, row.Id))
+                .From(rows, limit, row => new BookCursor(row.Title, row.Id.Value))
                 .Map(BookResponse.From));
     }
 }
