@@ -208,6 +208,12 @@ Two details:
 - **`ToString()` prints the bare number**, so a log line or an interpolated route says `7`,
   not `BookId { Value = 7 }`. Error context (`WithContext`) passes `.Value`, because Serilog
   would otherwise log the struct's shape.
+- **No implicit conversions.** `int` → `BookId` would let a bare number through, undoing the
+  whole point. `BookId` → `int` keeps a `LoanId` out of a `BookId` parameter (C# won't chain
+  two user-defined conversions), but lets the ids meet as numbers everywhere else:
+  `loan.Id == book.Id` compiles and is true when the numbers match, `book.Id + 1` compiles, and
+  a `LoanId` fits any `int` parameter. The explicit `.Value` appears only where a value leaves
+  the typed world (response DTOs, cursors, log context), which makes those places easy to see.
 - **`MemberId`** is the same idea for the caller, and arrived first: a `string` from the
   token's `sub` claim, bound by `BindAsync` instead of `TryParse`.
 

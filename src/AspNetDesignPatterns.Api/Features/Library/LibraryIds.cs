@@ -12,6 +12,13 @@ namespace AspNetDesignPatterns.Api.Features.Library;
 //
 // In the OpenAPI document they're plain integers too (IdOpenApiSchemaTransformer).
 //
+// No implicit conversions, in either direction, on purpose. int -> BookId would let a bare
+// number (or another id's .Value) through, which is the mistake these types exist to stop.
+// BookId -> int still rejects a LoanId where a BookId belongs, but it lets the two ids meet as
+// ints elsewhere: loan.Id == book.Id compiles (and is true when the numbers match), book.Id + 1
+// compiles, and a LoanId fits any int parameter, even one named bookId. The few explicit .Value
+// calls mark exactly where a value leaves the typed world (DTOs, cursors, log context).
+//
 // readonly record structs: no allocation, value equality, and nothing to null-check. Both
 // override ToString to print the bare number, so a log line or an interpolated route says "7",
 // not "BookId { Value = 7 }".
