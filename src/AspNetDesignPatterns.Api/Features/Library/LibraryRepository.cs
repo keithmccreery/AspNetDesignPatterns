@@ -31,13 +31,15 @@ internal sealed class LibraryRepository : ILibraryRepository
         int take,
         CancellationToken cancellationToken)
     {
+        // The search is a filter only: books_search (003_books_search.sql) finds the matching
+        // ids, and the order stays (title, id), so the cursor works the same with or without one.
         // (title, id) > (@AfterTitle, @AfterId) is a row-value comparison: "after this exact
         // position", which the (title, id) index can seek to. The id makes the order strict, so
         // two books with the same title are neither skipped nor repeated at a page boundary.
         const string SQL = $"""
             SELECT {BOOK_COLUMNS}
             FROM books
-            WHERE (@Pattern IS NULL OR title LIKE @Pattern ESCAPE '\' OR author LIKE @Pattern ESCAPE '\')
+            WHERE (@Search IS NULL OR id IN (SELECT rowid FROM books_search WHERE books_search MATCH @Search))
               AND (@AfterTitle IS NULL OR (title, id) > (@AfterTitle, @AfterId))
             ORDER BY title, id
             LIMIT @Take;
@@ -45,7 +47,7 @@ internal sealed class LibraryRepository : ILibraryRepository
 
         return [.. await QueryAsync<BookRow>(
             SQL,
-            new { Pattern = ContainsPattern(search), AfterTitle = after?.Title, AfterId = after?.Id, Take = take },
+            new { Search = SearchPhrase(search), AfterTitle = after?.Title, AfterId = after?.Id, Take = take },
             cancellationToken)];
     }
 
@@ -177,12 +179,12 @@ internal sealed class LibraryRepository : ILibraryRepository
     private CommandDefinition Command(string sql, object parameters, CancellationToken cancellationToken) =>
         new(sql, parameters, _unitOfWork.Transaction, cancellationToken: cancellationToken);
 
-    // User input inside LIKE: escape its own wildcards so "50%" means the text "50%".
-    private static string? ContainsPattern(string? search) =>
+    // User input inside MATCH: FTS5 has its own query language (AND, OR, NOT, NEAR, *, column
+    // filters), so wrap the whole input in double quotes -- doubling any it contains -- to make
+    // it one literal phrase. "100%" then means the text "100%", and "pride and" those words in
+    // that order, anywhere in the title or author.
+    private static string? SearchPhrase(string? search) =>
         string.IsNullOrWhiteSpace(search)
             ? null
-            : "%" + search.Trim()
-                .Replace(@"\", @"\\", StringComparison.Ordinal)
-                .Replace("%", @"\%", StringComparison.Ordinal)
-                .Replace("_", @"\_", StringComparison.Ordinal) + "%";
+            : "\"" + search.Trim().Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
 }

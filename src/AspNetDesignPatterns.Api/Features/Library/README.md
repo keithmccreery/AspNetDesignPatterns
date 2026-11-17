@@ -41,6 +41,7 @@ carry both (`Jwt:DevTokenScopes`).
 | `DateTimeOffsetTypeHandler.cs` | Dapper ↔ ISO-8601 UTC text, since SQLite has no date type. |
 | `LibraryDatabaseInitializer.cs` | `IHostedService` that runs `SqlScriptMigrator` on `Schema/*.sql` before the server starts listening. |
 | `Schema/001_create_tables.sql`, `002_seed_books.sql` | The schema, and 50 public-domain books to page through. |
+| `Schema/003_books_search.sql` | The `books_search` full-text index (FTS5, trigram tokenizer) and the triggers that keep it in sync. See [Search](#search). |
 | `LibraryDatabaseHealthCheck.cs` | `SELECT 1`, tagged `ready`; `Unhealthy` on failure (the app's own database, unlike Weather's `Degraded` upstream). |
 
 ## Request flow: borrowing a book
@@ -94,9 +95,41 @@ data never collide at a page boundary. See
 [`KAM.Common/Pagination/README.md`](../../../KAM.Common/Pagination/README.md) for the cursor
 format, its validation, and cursor vs offset.
 
-Search is `LIKE '%…%'` on title or author, case-insensitive for ASCII, with `%`, `_` and `\`
-in the input escaped so they match literally. It can't use an index; for a large catalogue,
-SQLite's FTS5 (or the database's full-text search) is the next step.
+## Search
+
+`?search=` matches **anywhere in the title or author** ("acu" finds *Dracula*), ignoring case
+and accents ("bronte" finds *Brontë*). It runs against `books_search`, an
+[FTS5](https://sqlite.org/fts5.html) full-text index created by `Schema/003_books_search.sql`
+with the **trigram tokenizer**: the index records every 3-character slice of the text, which is
+what lets it match inside a word. (FTS5's default tokenizer indexes whole words, so it can only
+match a word or, with `*`, the start of one.)
+
+How it fits together:
+
+- **A filter, not an order.** The query finds matching ids in `books_search` and keeps the
+  usual `ORDER BY title, id`, so search results page with the same `(title, id)` cursor as the
+  full list.
+- **Literal input.** FTS5 has its own query language (`AND`, `OR`, `NOT`, `NEAR`, `*`, column
+  filters). The repository wraps the whole search in double quotes, doubling any inside it, so
+  it's always one literal phrase: `emma OR times` looks for that exact text, and `pride and`
+  for those words in that order.
+- **No second copy of the text.** `content='books'` makes it an *external-content* index: it
+  stores only the index and reads titles and authors from `books`. The cost is keeping it in
+  sync, which three triggers do on insert, delete, and an update **of `title` or `author`**
+  (not of `available_copies`, which every borrow and return changes).
+- **Existing databases** get the index the next time the app starts: the migrator applies
+  `003`, which builds it from the books already there.
+
+Requirements and limitations:
+
+| | |
+|---|---|
+| **Minimum length** | A search must be at least **3 characters** after trimming. Shorter ones can't match any 3-character slice, so the validator returns a 400 rather than an empty page that looks like "no such book". |
+| **Index size** | About **3.6× the size of the indexed text**, which made the whole database about **2.5× larger** (measured on synthetic catalogues of 10,000 and 100,000 books; the 50-book seed adds 32 KB). |
+| **Speed** | A search that matches only a few books is where the index pays: one match in 100,000 books took **0.02 ms** against **21 ms** for the `LIKE` scan it replaced. A search matching thousands is about the same either way (and can be slightly slower), because the index collects every match before sorting, where `LIKE` walking the title index stops after one page. |
+| **No relevance ranking** | Results stay in title order. FTS5's `bm25()` could rank them, but its scores shift as books are added or removed, so a page boundary could move between requests; a ranked list would need a `(score, id)` cursor and that caveat documented. |
+| **No stemming or sound-alikes** | `run` doesn't find *ran*, and `drakula` doesn't find *Dracula*. The trigram tokenizer has no stemmer, and this SQLite build has neither `soundex()` nor the `spellfix1` extension. Sound-alike search would mean storing a phonetic key (e.g. Double Metaphone) computed in C#, or a database with it built in (PostgreSQL's `fuzzystrmatch` / `pg_trgm`). |
+| **Requires** | SQLite 3.34+ for the trigram tokenizer and 3.45+ for its `remove_diacritics` option. The bundled Microsoft.Data.Sqlite build is 3.53. |
 
 ## SQLite notes
 
@@ -113,7 +146,7 @@ SQLite's FTS5 (or the database's full-text search) is the next step.
 - **The file** is `library.db` in the content root (git-ignored), created and seeded on first
   run. Delete it to start over.
 - **Moving to PostgreSQL** means a new `IDbConnectionFactory` (Npgsql) and the SQL dialect
-  (`ILIKE`, identity columns, `timestamptz` instead of the type handler); `IUnitOfWork`,
+  (identity columns, `timestamptz` instead of the type handler, `pg_trgm` in place of the FTS5 index); `IUnitOfWork`,
   `SqlScriptMigrator`, the service, the handlers and the paging code don't change. A hosted
   database's connection string is a secret: it would come from `.env`, like `Jwt__SigningKey`.
 
@@ -165,11 +198,12 @@ in its own DI scope, like a request):
   handed to the service.
 - `ListBooksHandlerTests` — paging and search end to end: first page + cursor; following
   cursors visits every book once (equal titles across a page boundary); an insert behind the
-  cursor doesn't shift the next page; search on title or author, case-insensitive, with `%`
-  taken literally.
+  cursor doesn't shift the next page; search on title or author, case-insensitive, inside a
+  word, ignoring accents, with FTS5 syntax taken literally; the index follows a renamed and a
+  deleted book.
 - `ListLoansHandlerTests` — the caller's loans paged newest first, end to end.
 - `LibraryRequestValidatorTests` — configured max page size, a loan cursor rejected by the
-  book list, search length.
+  book list, search length (at most 100, at least 3 after trimming).
 - `LibraryInfrastructureTests` — `MemberId` binding with and without `sub`, data-source path
   resolution, health check healthy/unhealthy.
 

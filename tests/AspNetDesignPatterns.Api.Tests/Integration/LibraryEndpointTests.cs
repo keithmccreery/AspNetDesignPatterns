@@ -96,6 +96,21 @@ public class LibraryEndpointTests
     }
 
     [Test]
+    public async Task A_search_too_short_for_the_index_is_a_400_validation_problem()
+    {
+        // Arrange
+        HttpClient client = await NewMemberAsync();
+
+        // Act
+        HttpResponseMessage response = await client.GetAsync($"{BOOKS}?search=em");
+        ValidationProblemDetails? problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        problem!.Errors.Should().ContainKey("Search");
+    }
+
+    [Test]
     public async Task Borrow_returns_201_with_a_Location_that_serves_the_loan_then_return_closes_it()
     {
         // Arrange
